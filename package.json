@@ -8,8 +8,10 @@
   },
   "scripts": {
     "dev": "tsx watch src/cli/index.ts",
+    "dev:server": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/cli/index.js",
+    "start:server": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "lint": "echo \"lint not configured yet\""
   },

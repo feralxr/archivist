@@ -27,13 +27,15 @@ program
     const existing = await memoryStore.get(repoId);
     if (existing) {
       console.log(`Memory already exists for: ${existing.repoName}`);
-      console.log(`Version: ${existing.metadata.version} | PRs analyzed: ${existing.metadata.prsAnalyzed}`);
+      console.log(
+        `Version: ${existing.metadata.version} | PRs analyzed: ${existing.metadata.prsAnalyzed}`
+      );
       return;
     }
 
     const memory = await memoryStore.create(repoId, repoName);
     console.log(`✓ Created project memory for: ${memory.repoName}`);
-    console.log(`  Location: .archivist/`);
+    console.log(`  Data stored in .archivist/`);
   });
 
 program
@@ -67,22 +69,37 @@ program
 
     if (memory.styleRules.length) {
       console.log("\n--- Style Rules ---");
-      memory.styleRules.slice(0, 8).forEach((r) => console.log(`• ${r.rule}`));
+      memory.styleRules.slice(0, 10).forEach((r) => console.log(`• ${r.rule}`));
     }
     if (memory.architectureNotes.length) {
       console.log("\n--- Architecture ---");
-      memory.architectureNotes.slice(0, 6).forEach((n) => console.log(`• ${n.note}`));
+      memory.architectureNotes
+        .slice(0, 8)
+        .forEach((n) => console.log(`• ${n.note}`));
+    }
+    if (memory.patterns.length) {
+      console.log("\n--- Patterns ---");
+      memory.patterns.slice(0, 10).forEach((p) => {
+        const tag = p.preferred ? "preferred" : "discouraged";
+        console.log(`• [${tag}] ${p.description}`);
+      });
     }
   });
 
 program
   .command("memory:add")
   .description("Manually add knowledge to project memory")
-  .requiredOption("-t, --type <type>", "style | architecture | preferred | discouraged")
+  .requiredOption(
+    "-t, --type <type>",
+    "style | architecture | preferred | discouraged"
+  )
   .requiredOption("-c, --content <content>", "The rule or note")
   .action(async (opts) => {
     const repoId = process.cwd();
-    const memory = await memoryStore.getOrCreate(repoId, repoId.split(/[\\/]/).pop() || "repo");
+    await memoryStore.getOrCreate(
+      repoId,
+      repoId.split(/[\\/]/).pop() || "repo"
+    );
 
     const content = opts.content;
 
@@ -110,7 +127,9 @@ program
         });
         break;
       default:
-        console.error("Type must be: style | architecture | preferred | discouraged");
+        console.error(
+          "Type must be: style | architecture | preferred | discouraged"
+        );
         process.exit(1);
     }
 
@@ -131,7 +150,7 @@ program
       process.exit(1);
     }
 
-    let diff = opts.diff;
+    let diff = opts.diff as string | undefined;
 
     if (opts.file) {
       if (!existsSync(opts.file)) {
@@ -142,13 +161,15 @@ program
     }
 
     if (!diff) {
-      // Try reading from stdin in the future; for now require explicit input
       console.error("Provide a diff with --file or --diff");
       process.exit(1);
     }
 
     const repoId = process.cwd();
-    await memoryStore.getOrCreate(repoId, repoId.split(/[\\/]/).pop() || "repo");
+    await memoryStore.getOrCreate(
+      repoId,
+      repoId.split(/[\\/]/).pop() || "repo"
+    );
 
     const model = createModelFromEnv();
     const engine = new ReviewEngine(model);

@@ -34,35 +34,23 @@ export class OpenRouterModel implements ReviewModel {
     memoryContext: string;
     systemInstructions: string;
   }): Promise<string> {
-    const { diff, memoryContext, systemInstructions } = params;
-
-    const userContent = `
-## Project Memory (what this codebase values)
-
-${memoryContext || "No project memory available yet."}
-
-## Diff to review
-
-\`\`\`diff
-${diff}
-\`\`\`
-
-Please review the changes carefully using the project memory above.
-`.trim();
+    // memoryContext now contains the fully built user prompt from the review engine
+    const userContent = params.memoryContext;
 
     const response = await this.client.chat.completions.create({
       model: this.model,
       messages: [
         {
           role: "system",
-          content: systemInstructions,
+          content: params.systemInstructions,
         },
         {
           role: "user",
           content: userContent,
         },
       ],
-      temperature: 0.2, // lower temperature for more consistent reviews
+      temperature: 0.15,
+      max_tokens: 4096,
     });
 
     const content = response.choices[0]?.message?.content;
