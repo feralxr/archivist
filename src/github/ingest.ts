@@ -1,5 +1,7 @@
 import type { Octokit } from "@octokit/rest";
 import { memoryStore } from "../memory/store.js";
+import { promoteFeedback, inferFromSnippets } from "../memory/learn.js";
+import { log } from "../core/logger.js";
 
 interface IngestOptions {
   owner: string;
@@ -43,17 +45,21 @@ export async function ingestPullRequest(
       await memoryStore.save(memory);
     }
 
-    console.log(
-      `[ingest] Processed ${owner}/${repo}#${pullNumber} — ${reviewComments.length} comments`
-    );
+    log.info("Ingested PR comments", {
+      repo: `${owner}/${repo}`,
+      pr: pullNumber,
+      comments: reviewComments.length,
+    });
   } catch (err) {
-    console.error("[ingest] Failed", err);
+    log.error("Ingest failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
 /**
  * Bootstrap memory from historical merged PRs.
- * This is the key differentiator — learn the team's real preferences.
+ * This is the main learning loop entry for new installations.
  */
 export async function bootstrapRepositoryMemory(
   octokit: Octokit,
@@ -61,8 +67,8 @@ export async function bootstrapRepositoryMemory(
   repo: string,
   repoId: string,
   limit = 40
-) {
-  console.log(`[bootstrap] Analyzing last ${limit} PRs for ${owner}/${repo}...`);
+): Promise<{ processed: number; commentsIngested: number; promoted: number; inferred: number }> {
+  log.info("Bootstrap starting", { repo: `${owner}/${repo}`, limit });
 
   await memoryStore.getOrCreate(repoId, `${owner}/${repo}`);
 
@@ -100,8 +106,7 @@ export async function bootstrapRepositoryMemory(
           createdAt: comment.created_at,
         });
 
-        // Promote concise feedback
-        if (comment.body.length < 260) {
+        if (comment.body.length <= 280) {
           await memoryStore.addHistoricalFeedback(repoId, {
             summary: comment.body.replace(/\s+/g, " ").trim().slice(0, 300),
             prNumber: pr.number,
@@ -126,9 +131,17 @@ export async function bootstrapRepositoryMemory(
     await memoryStore.save(memory);
   }
 
-  console.log(
-    `[bootstrap] Done — ${processed} PRs, ${commentsIngested} comments ingested`
-  );
+  // Learning pass on what we collected
+  const { promoted } = await promoteFeedback(repoId);
+  const { inferred } = await inferFromSnippets(repoId);
 
-  return { processed, commentsIngested };
+  log.info("Bootstrap complete", {
+    repo: `${owner}/${repo}`,
+    processed,
+    commentsIngested,
+    promoted,
+    inferred,
+  });
+
+  return { processed, commentsIngested, promoted, inferred };
 }

@@ -1,12 +1,13 @@
 import type { EmitterWebhookEvent } from "@octokit/webhooks";
 import { memoryStore } from "../memory/store.js";
 import { getInstallationOctokit, createGitHubApp } from "./app.js";
+import { promoteFeedback } from "../memory/learn.js";
+import { log } from "../core/logger.js";
 
 type ReviewEvent = EmitterWebhookEvent<"pull_request_review">;
 
 /**
- * Learn from human-submitted reviews.
- * High-signal comments get folded into project memory.
+ * Learn from human-submitted reviews — core of the learning loop.
  */
 export async function handleReviewSubmitted(event: ReviewEvent) {
   const { payload } = event;
@@ -15,16 +16,22 @@ export async function handleReviewSubmitted(event: ReviewEvent) {
   const review = payload.review;
   const installationId = payload.installation?.id;
 
-  // Ignore our own reviews
   if (review.user?.type === "Bot") return;
   if (!installationId) return;
+
+  // Ignore our own bot reviews
+  const login = review.user?.login?.toLowerCase() || "";
+  if (login.includes("archivist")) return;
 
   const repoId = String(repo.id);
   const repoFullName = repo.full_name;
 
-  console.log(
-    `[learn] Human review on ${repoFullName}#${pr.number} by @${review.user?.login}`
-  );
+  log.info("Learning from human review", {
+    repo: repoFullName,
+    pr: pr.number,
+    reviewer: review.user?.login,
+    state: review.state,
+  });
 
   try {
     await memoryStore.getOrCreate(repoId, repoFullName);
@@ -32,14 +39,12 @@ export async function handleReviewSubmitted(event: ReviewEvent) {
     const app = createGitHubApp();
     const octokit = await getInstallationOctokit(app, installationId);
 
-    // Fetch review comments for this review
     const { data: comments } = await octokit.pulls.listReviewComments({
       owner: repo.owner.login,
       repo: repo.name,
       pull_number: pr.number,
     });
 
-    // Only comments that belong to this review (approx by time/user)
     const humanComments = comments.filter(
       (c) =>
         c.user?.login === review.user?.login &&
@@ -47,6 +52,8 @@ export async function handleReviewSubmitted(event: ReviewEvent) {
         c.body.length > 25 &&
         c.user?.type !== "Bot"
     );
+
+    let ingested = 0;
 
     for (const comment of humanComments) {
       await memoryStore.addRawSnippet(repoId, {
@@ -57,18 +64,18 @@ export async function handleReviewSubmitted(event: ReviewEvent) {
         createdAt: comment.created_at,
       });
 
-      // Promote short, clear feedback into historical feedback
-      if (comment.body.length < 280 && comment.body.length > 30) {
+      // Promote concise actionable comments into historical feedback
+      if (comment.body.length >= 30 && comment.body.length <= 280) {
         await memoryStore.addHistoricalFeedback(repoId, {
           summary: comment.body.replace(/\s+/g, " ").trim(),
           prNumber: pr.number,
           frequency: 1,
-          lastSeen: new Date().toISOString(),
+          lastSeen: comment.created_at,
         });
       }
+      ingested++;
     }
 
-    // Also capture the top-level review body if present
     if (review.body && review.body.length > 40) {
       await memoryStore.addRawSnippet(repoId, {
         text: review.body,
@@ -78,10 +85,18 @@ export async function handleReviewSubmitted(event: ReviewEvent) {
       });
     }
 
-    console.log(
-      `[learn] Ingested ${humanComments.length} human comments into memory`
-    );
+    // Periodically promote frequent feedback into durable rules
+    const { promoted } = await promoteFeedback(repoId);
+
+    log.info("Learning pass complete", {
+      repo: repoFullName,
+      pr: pr.number,
+      ingested,
+      promoted,
+    });
   } catch (err) {
-    console.error("[learn] Failed", err);
+    log.error("Learning failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }

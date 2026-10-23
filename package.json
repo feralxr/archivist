@@ -1,7 +1,7 @@
 {
   "name": "archivist",
   "version": "0.1.0",
-  "description": "Intelligent code review agent with deep project memory",
+  "description": "Memory-aware code review for GitHub \u2014 high-signal PR reviews that learn your codebase",
   "type": "module",
   "bin": {
     "archivist": "./dist/cli/index.js"
@@ -18,10 +18,12 @@
   "keywords": [
     "code-review",
     "ai",
-    "github",
-    "agent",
-    "memory",
-    "developer-tools"
+    "github-app",
+    "developer-tools",
+    "pull-request",
+    "codebase-memory",
+    "openrouter",
+    "cli"
   ],
   "author": "feralxr",
   "license": "MIT",
@@ -43,5 +45,13 @@
     "@types/react": "^18.3.11",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/feralxr/archivist.git"
+  },
+  "bugs": {
+    "url": "https://github.com/feralxr/archivist/issues"
+  },
+  "homepage": "https://github.com/feralxr/archivist#readme"
 }

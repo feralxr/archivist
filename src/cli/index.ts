@@ -9,6 +9,7 @@ import { hasOpenRouter, hasGitHubApp, env } from "../core/config.js";
 import { memoryStore } from "../memory/store.js";
 import { ReviewEngine } from "../review/engine.js";
 import { resolveLocalRepoIdentity, getGitDiff } from "../memory/identity.js";
+import { runLearningPass, memoryQualityScore } from "../memory/learn.js";
 
 const program = new Command();
 
@@ -133,6 +134,11 @@ program
       console.log(`  Raw snippets         ${stats.rawSnippets}`);
       console.log(`  PRs analyzed         ${stats.prsAnalyzed}`);
       console.log(`  Embeddings           ${stats.hasEmbeddings ? "yes" : "no"}`);
+      const mem = await memoryStore.get(repoId);
+      if (mem) {
+        const q = memoryQualityScore(mem);
+        console.log(`  Quality              ${q.score}/100 (${q.label})`);
+      }
     }
     console.log("");
   });
@@ -406,6 +412,50 @@ program
     const model = createModelFromEnv();
     console.log(`Provider : ${model.name}`);
     console.log(`Model    : ${model.model}`);
+  });
+
+
+program
+  .command("memory:learn")
+  .description("Run learning pass: consolidate, promote feedback, infer rules")
+  .action(async () => {
+    const { repoId } = resolveLocalRepoIdentity();
+    const memory = await memoryStore.get(repoId);
+    if (!memory) {
+      console.error("No memory found. Run archivist init first.");
+      process.exit(1);
+    }
+    console.log("Running learning pass...");
+    const result = await runLearningPass(repoId);
+    console.log(`✓ Merged feedback: ${result.merged}`);
+    console.log(`✓ Trimmed snippets: ${result.trimmed}`);
+    console.log(`✓ Promoted to rules/patterns: ${result.promoted}`);
+    console.log(`✓ Inferred from snippets: ${result.inferred}`);
+    const updated = await memoryStore.get(repoId);
+    if (updated) {
+      const q = memoryQualityScore(updated);
+      console.log(`Memory quality: ${q.score}/100 (${q.label})`);
+    }
+  });
+
+program
+  .command("memory:quality")
+  .description("Score how strong project memory is")
+  .action(async () => {
+    const { repoId, repoName } = resolveLocalRepoIdentity();
+    const memory = await memoryStore.get(repoId);
+    if (!memory) {
+      console.log(`No memory for ${repoName}. Run archivist init.`);
+      process.exit(1);
+    }
+    const q = memoryQualityScore(memory);
+    console.log(`\n${memory.repoName}`);
+    console.log(`Quality: ${q.score}/100 (${q.label})\n`);
+    if (q.tips.length) {
+      console.log("Tips to improve:");
+      q.tips.forEach((t) => console.log(`  • ${t}`));
+      console.log("");
+    }
   });
 
 program

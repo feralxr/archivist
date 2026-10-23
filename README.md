@@ -2,71 +2,66 @@
 
 **Memory-aware code review for GitHub.**
 
-Archivist reviews pull requests with knowledge of *your* codebase — style, architecture, and what human reviewers have actually asked for before. High signal. Low noise.
+Archivist reviews pull requests using *your* project’s style, architecture, and past human feedback — not generic AI nits.
 
-## Product focus
+High signal. Low noise. Gets better as your team reviews code.
 
-Industry-level depth on two things:
-
-1. **Review quality** — staff-engineer signal, not linter spam  
-2. **GitHub App** — install once, automatic reviews on every PR  
-
-Everything else (CLI, TUI, local memory tools) supports that product.
-
-## Why it is different
-
-Most AI review bots treat every PR in isolation.  
-Archivist maintains **project memory**:
-
-- Style rules the team actually follows  
-- Architecture constraints  
-- Preferred vs discouraged patterns  
-- Recurring human review feedback  
-
-Comments that come from memory include a short **why** so the feedback is explainable.
-
-## Quick start (GitHub App)
-
-See **[docs/GITHUB_APP.md](docs/GITHUB_APP.md)** for the full install path.
+## Install
 
 ```bash
-npm install
-cp .env.example .env
-# Set OPENROUTER_API_KEY + GitHub App credentials
-
-npm run dev:server
-# Expose with cloudflared/ngrok and install the app on a repo
+git clone https://github.com/feralxr/archivist.git
+cd archivist && npm install
+cp .env.example .env   # add OPENROUTER_API_KEY
 ```
 
-## CLI (supporting tools)
+**Local review (now):**
 
 ```bash
-npx tsx src/cli/index.ts setup
-npx tsx src/cli/index.ts doctor
 npx tsx src/cli/index.ts init
 npx tsx src/cli/index.ts memory:add -t style -c "Prefer early returns"
-npx tsx src/cli/index.ts review --file changes.diff
+npx tsx src/cli/index.ts review          # current git diff
+npx tsx src/cli/index.ts memory:learn    # improve memory from evidence
+npx tsx src/cli/index.ts memory:quality
 ```
 
-## Review quality standards
+**Automatic PR reviews:** [docs/GITHUB_APP.md](docs/GITHUB_APP.md)
 
-- Prefer **0–5** strong comments over noisy walls of text  
-- Empty comment list is a valid outcome for clean PRs  
-- Severity discipline: error / warning / suggestion / info  
-- Memory-backed comments carry an explanation  
-- Bot PRs skipped · draft PRs skipped · huge diffs get a notice · same commit not reviewed twice  
+Full install paths: [docs/INSTALL.md](docs/INSTALL.md)
+
+## Why teams use it
+
+| Generic AI review bots | Archivist |
+|------------------------|-----------|
+| Every PR in isolation | Persistent **project memory** |
+| Noisy comment walls | Hard caps, severity discipline |
+| Opaque suggestions | Memory-backed **why** explanations |
+| Static | Learns from human reviews |
+
+## How learning works
+
+Human review comments → snippets & feedback → consolidate → promote to rules/patterns → next review uses them.
+
+Details: [docs/LEARNING.md](docs/LEARNING.md)
+
+## Docs
+
+| Doc | Topic |
+|-----|--------|
+| [INSTALL.md](docs/INSTALL.md) | CLI + GitHub App install |
+| [CLI.md](docs/CLI.md) | Local workflow |
+| [GITHUB_APP.md](docs/GITHUB_APP.md) | Production app setup |
+| [LEARNING.md](docs/LEARNING.md) | Learning loop |
 
 ## Architecture
 
 ```
 src/
-├── review/     # Industry-level prompts + engine + post-processing
-├── github/     # GitHub App, handlers, comments, ingest, learn
-├── memory/     # Project memory (supports the review)
-├── models/     # OpenRouter (pluggable)
-├── core/       # Config, retry, queue, logging
-├── cli/        # Setup, doctor, local review helpers
-└── server.ts   # Webhook server
+├── review/     Review engine + prompts (signal-first)
+├── github/     GitHub App, ingest, learn from humans
+├── memory/     Project memory, embeddings, learning pass
+├── models/     OpenRouter (pluggable)
+├── cli/        Local workflow
+└── server.ts   Webhooks
 ```
 
 ## License
