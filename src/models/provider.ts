@@ -51,7 +51,7 @@ export function createModelFromEnv(): ReviewModel {
   if (openrouterKey) {
     return createModel({
       provider: "openrouter",
-      model: process.env.ARCHIVIST_MODEL || "google/gemini-2.0-flash-exp:free",
+      model: process.env.ARCHIVIST_MODEL || "recursive/flint-v1.0:free",
       apiKey: openrouterKey,
     });
   }

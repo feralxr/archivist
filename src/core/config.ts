@@ -5,7 +5,7 @@ loadEnv();
 
 const envSchema = z.object({
   OPENROUTER_API_KEY: z.string().optional(),
-  ARCHIVIST_MODEL: z.string().default("google/gemini-2.0-flash-exp:free"),
+  ARCHIVIST_MODEL: z.string().default("recursive/flint-v1.0:free"),
   ARCHIVIST_EMBEDDING_MODEL: z.string().default("openai/text-embedding-3-small"),
 
   GITHUB_APP_ID: z.string().optional(),

@@ -30,7 +30,7 @@ program
    • Create a key (free models available)
    • Add to .env:
        OPENROUTER_API_KEY=sk-or-...
-       ARCHIVIST_MODEL=google/gemini-2.0-flash-exp:free
+       ARCHIVIST_MODEL=recursive/flint-v1.0:free
 
 2. Create a GitHub App
    • https://github.com/settings/apps/new

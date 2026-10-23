@@ -14,7 +14,7 @@ export class OpenRouterModel implements ReviewModel {
       throw new Error("OpenRouter API key is required");
     }
 
-    this.model = config.model || "google/gemini-2.0-flash-exp:free";
+    this.model = config.model || "recursive/flint-v1.0:free";
 
     this.client = new OpenAI({
       apiKey: config.apiKey,
@@ -23,7 +23,7 @@ export class OpenRouterModel implements ReviewModel {
         "HTTP-Referer": "https://github.com/feralxr/archivist",
         "X-Title": "Archivist",
       },
-      timeout: 90_000,
+      timeout: 120_000,
     });
   }
 
@@ -43,11 +43,26 @@ export class OpenRouterModel implements ReviewModel {
             { role: "user", content: userContent },
           ],
           temperature: 0.15,
-          max_tokens: 4096,
+          max_tokens: 8192,
         });
 
-        const text = response.choices[0]?.message?.content;
-        if (!text) throw new Error("Model returned empty response");
+        const message = response.choices[0]?.message as any;
+        let text = message?.content?.trim?.() || message?.content || "";
+
+        // Some free models put most tokens into reasoning and leave content empty.
+        // Fall back to extracting JSON from reasoning if needed.
+        if (!text && message?.reasoning) {
+          const reasoning = String(message.reasoning);
+          const jsonMatch = reasoning.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            log.warn("Model content empty; recovered JSON from reasoning field");
+            text = jsonMatch[0];
+          }
+        }
+
+        if (!text) {
+          throw new Error("Model returned empty response");
+        }
         return text;
       },
       {
