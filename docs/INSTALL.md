@@ -42,3 +42,11 @@ Short version:
 - Node.js 20+
 - OpenRouter API key ([openrouter.ai](https://openrouter.ai) — free models available)
 - For the App path: ability to receive GitHub webhooks (public URL or tunnel)
+
+## Verify install
+
+```bash
+npm test
+```
+
+See [TESTING.md](./TESTING.md).

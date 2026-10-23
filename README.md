@@ -43,6 +43,15 @@ Human review comments → snippets & feedback → consolidate → promote to rul
 
 Details: [docs/LEARNING.md](docs/LEARNING.md)
 
+## Test
+
+```bash
+npm test          # exhaustive suite (live tests if OPENROUTER_API_KEY set)
+npm run test:core # no API calls
+```
+
+See [docs/TESTING.md](docs/TESTING.md).
+
 ## Docs
 
 | Doc | Topic |

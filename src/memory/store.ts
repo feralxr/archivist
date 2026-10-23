@@ -14,15 +14,17 @@ import type {
   MemoryStats,
 } from "./types.js";
 
-const DATA_DIR = env.ARCHIVIST_DATA_DIR || path.join(process.cwd(), ".archivist");
+function dataDir() {
+  return env.ARCHIVIST_DATA_DIR || path.join(process.cwd(), ".archivist");
+}
 
 async function ensureDataDir() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.mkdir(dataDir(), { recursive: true });
 }
 
 function memoryPath(repoId: string) {
   const safe = repoId.replace(/[^a-zA-Z0-9-_.]/g, "_");
-  return path.join(DATA_DIR, `${safe}.json`);
+  return path.join(dataDir(), `${safe}.json`);
 }
 
 export class MemoryStore {

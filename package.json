@@ -13,7 +13,10 @@
     "start": "node dist/cli/index.js",
     "start:server": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "lint": "echo \"lint not configured yet\""
+    "lint": "echo \"lint not configured yet\"",
+    "test": "tsx scripts/test-all.ts",
+    "test:core": "ARCHIVIST_SKIP_LIVE=1 tsx scripts/test-all.ts",
+    "test:live": "tsx scripts/test-all.ts"
   },
   "keywords": [
     "code-review",

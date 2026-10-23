@@ -1,0 +1,57 @@
+{
+  "repoId": "test/fixture-repo",
+  "repoName": "fixture-repo",
+  "styleRules": [
+    {
+      "id": "s1",
+      "rule": "Prefer semicolons",
+      "source": "manual",
+      "confidence": 1
+    },
+    {
+      "id": "s2",
+      "rule": "Prefer early returns over nested conditionals",
+      "source": "manual",
+      "confidence": 1
+    }
+  ],
+  "architectureNotes": [
+    {
+      "id": "a1",
+      "note": "Keep API layer free of UI imports"
+    }
+  ],
+  "patterns": [
+    {
+      "id": "p1",
+      "description": "Use Zod for external input validation",
+      "preferred": true
+    },
+    {
+      "id": "p2",
+      "description": "Avoid any types in public APIs",
+      "preferred": false
+    }
+  ],
+  "historicalFeedback": [
+    {
+      "id": "f1",
+      "summary": "Please add error handling for edge cases",
+      "frequency": 3,
+      "lastSeen": "2026-01-01T00:00:00.000Z"
+    }
+  ],
+  "rawSnippets": [
+    {
+      "id": "r1",
+      "text": "Prefer early returns in this codebase instead of deep nesting",
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    }
+  ],
+  "metadata": {
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-01-01T00:00:00.000Z",
+    "version": 1,
+    "prsAnalyzed": 5
+  }
+}
