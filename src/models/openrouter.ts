@@ -1,12 +1,9 @@
 import OpenAI from "openai";
 import type { ModelConfig } from "../core/types.js";
 import type { ReviewModel } from "./provider.js";
+import { withRetry } from "../core/retry.js";
+import { log } from "../core/logger.js";
 
-/**
- * OpenRouter provider.
- * Uses the OpenAI-compatible API so we can support hundreds of models
- * (including free ones) with a single integration.
- */
 export class OpenRouterModel implements ReviewModel {
   readonly name = "openrouter";
   readonly model: string;
@@ -26,6 +23,7 @@ export class OpenRouterModel implements ReviewModel {
         "HTTP-Referer": "https://github.com/feralxr/archivist",
         "X-Title": "Archivist",
       },
+      timeout: 90_000,
     });
   }
 
@@ -34,30 +32,35 @@ export class OpenRouterModel implements ReviewModel {
     memoryContext: string;
     systemInstructions: string;
   }): Promise<string> {
-    // memoryContext now contains the fully built user prompt from the review engine
     const userContent = params.memoryContext;
 
-    const response = await this.client.chat.completions.create({
-      model: this.model,
-      messages: [
-        {
-          role: "system",
-          content: params.systemInstructions,
-        },
-        {
-          role: "user",
-          content: userContent,
-        },
-      ],
-      temperature: 0.15,
-      max_tokens: 4096,
-    });
+    const content = await withRetry(
+      async () => {
+        const response = await this.client.chat.completions.create({
+          model: this.model,
+          messages: [
+            { role: "system", content: params.systemInstructions },
+            { role: "user", content: userContent },
+          ],
+          temperature: 0.15,
+          max_tokens: 4096,
+        });
 
-    const content = response.choices[0]?.message?.content;
-
-    if (!content) {
-      throw new Error("Model returned empty response");
-    }
+        const text = response.choices[0]?.message?.content;
+        if (!text) throw new Error("Model returned empty response");
+        return text;
+      },
+      {
+        retries: 3,
+        onRetry: (err, attempt) => {
+          log.warn("Model call failed, retrying", {
+            attempt,
+            model: this.model,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        },
+      }
+    );
 
     return content;
   }

@@ -1,6 +1,8 @@
 import { createServer } from "node:http";
 import { createGitHubApp, createWebhookMiddleware } from "./github/app.js";
 import { env, hasGitHubApp, hasOpenRouter } from "./core/config.js";
+import { log } from "./core/logger.js";
+import { reviewQueue } from "./core/queue.js";
 
 async function main() {
   console.log("╔══════════════════════════════════════╗");
@@ -17,43 +19,70 @@ async function main() {
   }
 
   if (!hasOpenRouter()) {
-    console.warn(
-      "⚠ OPENROUTER_API_KEY not set — reviews will be skipped until configured.\n"
-    );
+    log.warn("OPENROUTER_API_KEY not set — reviews will be skipped");
   }
 
   const app = createGitHubApp();
   const middleware = createWebhookMiddleware(app);
 
   const server = createServer(async (req, res) => {
-    if (req.url === "/health" || req.url === "/") {
+    const url = req.url || "/";
+
+    if (url === "/health" || url === "/") {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
           status: "ok",
           service: "archivist",
+          queue: reviewQueue.stats,
           timestamp: new Date().toISOString(),
         })
       );
       return;
     }
 
-    middleware(req, res, () => {
-      res.writeHead(404);
-      res.end("Not found");
-    });
+    if (url === "/ready") {
+      const ready = hasGitHubApp() && hasOpenRouter();
+      res.writeHead(ready ? 200 : 503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ready, githubApp: hasGitHubApp(), model: hasOpenRouter() }));
+      return;
+    }
+
+    try {
+      middleware(req, res, () => {
+        res.writeHead(404);
+        res.end("Not found");
+      });
+    } catch (err) {
+      log.error("Webhook middleware error", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      res.writeHead(500);
+      res.end("Internal error");
+    }
   });
+
+  // Graceful shutdown
+  const shutdown = () => {
+    log.info("Shutting down...");
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(1), 10_000).unref();
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 
   const port = env.PORT || 3000;
   server.listen(port, () => {
-    console.log(`\nListening on http://localhost:${port}`);
-    console.log(`Webhook  → http://localhost:${port}/api/github/webhooks`);
-    console.log(`Health   → http://localhost:${port}/health`);
-    console.log("\nReady to receive GitHub webhooks.\n");
+    log.info(`Listening on http://localhost:${port}`);
+    log.info(`Webhook  → /api/github/webhooks`);
+    log.info(`Health   → /health`);
+    log.info(`Ready    → /ready`);
   });
 }
 
 main().catch((err) => {
-  console.error("Failed to start server", err);
+  log.error("Failed to start server", {
+    error: err instanceof Error ? err.message : String(err),
+  });
   process.exit(1);
 });

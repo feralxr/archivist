@@ -1,5 +1,7 @@
 import type { Octokit } from "@octokit/rest";
 import type { ReviewResult, ReviewComment } from "../core/types.js";
+import { withRetry } from "../core/retry.js";
+import { log } from "../core/logger.js";
 
 interface PostOptions {
   owner: string;
@@ -9,51 +11,49 @@ interface PostOptions {
   result: ReviewResult;
 }
 
-/**
- * Posts a review on the pull request.
- * Uses a single review with multiple comments for clean UX.
- */
 export async function postReviewComments(
   octokit: Octokit,
   options: PostOptions
 ) {
   const { owner, repo, pullNumber, commitId, result } = options;
 
-  // Build the review body (summary)
   let body = `### Archivist Review\n\n${result.summary}\n\n`;
   body += `_Model: ${result.modelUsed}_\n`;
 
-  // Map our comments into GitHub review comments
   const comments = result.comments
-    .filter((c) => c.path) // must have a path
+    .filter((c) => c.path)
     .map((c) => formatComment(c));
 
-  // GitHub allows creating a review with comments in one call
   try {
-    await octokit.pulls.createReview({
-      owner,
-      repo,
-      pull_number: pullNumber,
-      commit_id: commitId,
-      event: result.comments.some((c) => c.severity === "error")
-        ? "REQUEST_CHANGES"
-        : "COMMENT",
-      body,
-      comments: comments.length
-        ? comments.map((c) => ({
-            path: c.path,
-            line: c.line,
-            body: c.body,
-          }))
-        : undefined,
-    });
-
-    console.log(
-      `[comments] Posted review on ${owner}/${repo}#${pullNumber} (${comments.length} inline comments)`
+    await withRetry(() =>
+      octokit.pulls.createReview({
+        owner,
+        repo,
+        pull_number: pullNumber,
+        commit_id: commitId,
+        event: result.comments.some((c) => c.severity === "error")
+          ? "REQUEST_CHANGES"
+          : "COMMENT",
+        body,
+        comments: comments.length
+          ? comments.map((c) => ({
+              path: c.path,
+              line: c.line,
+              body: c.body,
+            }))
+          : undefined,
+      })
     );
+
+    log.info("Posted review", {
+      repo: `${owner}/${repo}`,
+      pr: pullNumber,
+      inline: comments.length,
+    });
   } catch (err: any) {
-    // Fallback: if multi-comment review fails (e.g. line positions), post a simple issue comment
-    console.warn("[comments] createReview failed, falling back to issue comment", err?.message);
+    log.warn("createReview failed, falling back to issue comment", {
+      error: err?.message,
+    });
 
     let fallback = body + "\n\n";
     for (const c of result.comments) {
@@ -61,12 +61,14 @@ export async function postReviewComments(
       fallback += `> ${c.body}\n\n`;
     }
 
-    await octokit.issues.createComment({
-      owner,
-      repo,
-      issue_number: pullNumber,
-      body: fallback,
-    });
+    await withRetry(() =>
+      octokit.issues.createComment({
+        owner,
+        repo,
+        issue_number: pullNumber,
+        body: fallback,
+      })
+    );
   }
 }
 
@@ -76,10 +78,5 @@ function formatComment(c: ReviewComment) {
     body += `\n\n*Why this matters: ${c.explanation}*`;
   }
   body += `\n\n<!-- archivist:${c.category}:${c.severity} -->`;
-
-  return {
-    path: c.path,
-    line: c.line,
-    body,
-  };
+  return { path: c.path, line: c.line, body };
 }

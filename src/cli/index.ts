@@ -26,7 +26,7 @@ program
 ╚══════════════════════════════════════════════════════════╝
 
 1. OpenRouter (required for reviews)
-   • Go to https://openrouter.ai → Keys
+   • https://openrouter.ai → Keys
    • Create a key (free models available)
    • Add to .env:
        OPENROUTER_API_KEY=sk-or-...
@@ -34,39 +34,138 @@ program
 
 2. Create a GitHub App
    • https://github.com/settings/apps/new
-   • Name: Archivist (or anything)
    • Homepage: https://github.com/feralxr/archivist
    • Webhook URL: https://YOUR_DOMAIN/api/github/webhooks
-     (use ngrok/cloudflared for local dev)
-   • Webhook secret: generate a random string
+     (use ngrok or cloudflared for local dev)
+   • Webhook secret: random string
    • Permissions:
-       - Repository permissions:
-           Pull requests: Read & Write
-           Contents: Read-only
-           Metadata: Read-only
-   • Subscribe to events:
-       - Pull request
-       - Pull request review
-   • Create the app → generate a Private Key
+       Pull requests: Read & Write
+       Contents: Read-only
+       Metadata: Read-only
+   • Events: Pull request, Pull request review
+   • Generate a Private Key after creating
 
 3. Put credentials in .env
    GITHUB_APP_ID=123456
    GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\\n...\\n-----END RSA PRIVATE KEY-----"
    GITHUB_WEBHOOK_SECRET=your_webhook_secret
 
-4. Install the app on a repository
-   • From the GitHub App page → Install App → choose repos
+4. Install the app on a repository (GitHub App page → Install)
 
-5. Start the server
+5. Start server
    npm run dev:server
 
-6. Open a PR on an installed repo and watch Archivist review it.
-
 Current status:
-  OpenRouter key : ${hasOpenRouter() ? "✓ set" : "✗ missing"}
-  GitHub App     : ${hasGitHubApp() ? "✓ credentials present" : "✗ missing"}
-  Model          : ${env.ARCHIVIST_MODEL}
+  OpenRouter : ${hasOpenRouter() ? "✓ set" : "✗ missing"}
+  GitHub App : ${hasGitHubApp() ? "✓ credentials present" : "✗ missing"}
+  Model      : ${env.ARCHIVIST_MODEL}
 `);
+  });
+
+program
+  .command("doctor")
+  .description("Check configuration and environment health")
+  .action(async () => {
+    console.log("\nArchivist Doctor\n");
+
+    const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
+
+    checks.push({
+      name: "OpenRouter API key",
+      ok: hasOpenRouter(),
+      detail: hasOpenRouter() ? "set" : "missing — reviews will not work",
+    });
+
+    checks.push({
+      name: "GitHub App ID",
+      ok: Boolean(env.GITHUB_APP_ID),
+      detail: env.GITHUB_APP_ID ? `set (${env.GITHUB_APP_ID})` : "missing",
+    });
+
+    checks.push({
+      name: "GitHub Private Key",
+      ok: Boolean(env.GITHUB_PRIVATE_KEY),
+      detail: env.GITHUB_PRIVATE_KEY ? "set" : "missing",
+    });
+
+    checks.push({
+      name: "Webhook secret",
+      ok: Boolean(env.GITHUB_WEBHOOK_SECRET),
+      detail: env.GITHUB_WEBHOOK_SECRET ? "set" : "not set (ok for local test)",
+    });
+
+    checks.push({
+      name: "Model",
+      ok: true,
+      detail: env.ARCHIVIST_MODEL,
+    });
+
+    const repoId = process.cwd();
+    const memory = await memoryStore.get(repoId);
+    checks.push({
+      name: "Local project memory",
+      ok: Boolean(memory),
+      detail: memory
+        ? `${memory.repoName} (v${memory.metadata.version}, ${memory.metadata.prsAnalyzed} PRs)`
+        : "none — run `archivist init`",
+    });
+
+    if (hasOpenRouter()) {
+      try {
+        const model = createModelFromEnv();
+        checks.push({
+          name: "Model client",
+          ok: true,
+          detail: `${model.name}/${model.model}`,
+        });
+      } catch (err) {
+        checks.push({
+          name: "Model client",
+          ok: false,
+          detail: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    for (const c of checks) {
+      const mark = c.ok ? "✓" : "✗";
+      console.log(`  ${mark}  ${c.name.padEnd(22)} ${c.detail}`);
+    }
+
+    const failed = checks.filter((c) => !c.ok).length;
+    console.log(
+      failed === 0
+        ? "\nAll critical checks passed.\n"
+        : `\n${failed} issue(s) found. Run \`archivist setup\` for help.\n`
+    );
+  });
+
+program
+  .command("status")
+  .description("Show current configuration and memory summary")
+  .action(async () => {
+    console.log("\nConfiguration");
+    console.log(`  OpenRouter : ${hasOpenRouter() ? "yes" : "no"}`);
+    console.log(`  GitHub App : ${hasGitHubApp() ? "yes" : "no"}`);
+    console.log(`  Model      : ${env.ARCHIVIST_MODEL}`);
+    console.log(`  Port       : ${env.PORT}`);
+    console.log(`  Env        : ${env.NODE_ENV}`);
+
+    const memory = await memoryStore.get(process.cwd());
+    console.log("\nProject Memory");
+    if (!memory) {
+      console.log("  (none — run archivist init)");
+    } else {
+      console.log(`  Repo       : ${memory.repoName}`);
+      console.log(`  Version    : ${memory.metadata.version}`);
+      console.log(`  PRs        : ${memory.metadata.prsAnalyzed}`);
+      console.log(`  Style      : ${memory.styleRules.length}`);
+      console.log(`  Arch       : ${memory.architectureNotes.length}`);
+      console.log(`  Patterns   : ${memory.patterns.length}`);
+      console.log(`  Feedback   : ${memory.historicalFeedback.length}`);
+      console.log(`  Snippets   : ${memory.rawSnippets.length}`);
+    }
+    console.log("");
   });
 
 program
