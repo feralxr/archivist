@@ -5,7 +5,7 @@ import React from "react";
 import { readFileSync, existsSync } from "node:fs";
 import { App } from "./ui/App.js";
 import { createModelFromEnv } from "../models/provider.js";
-import { hasOpenRouter } from "../core/config.js";
+import { hasOpenRouter, hasGitHubApp, env } from "../core/config.js";
 import { memoryStore } from "../memory/store.js";
 import { ReviewEngine } from "../review/engine.js";
 
@@ -15,6 +15,59 @@ program
   .name("archivist")
   .description("Intelligent code review agent with deep project memory")
   .version("0.1.0");
+
+program
+  .command("setup")
+  .description("Show setup instructions for GitHub App + models")
+  .action(() => {
+    console.log(`
+╔══════════════════════════════════════════════════════════╗
+║                 Archivist Setup Guide                    ║
+╚══════════════════════════════════════════════════════════╝
+
+1. OpenRouter (required for reviews)
+   • Go to https://openrouter.ai → Keys
+   • Create a key (free models available)
+   • Add to .env:
+       OPENROUTER_API_KEY=sk-or-...
+       ARCHIVIST_MODEL=google/gemini-2.0-flash-exp:free
+
+2. Create a GitHub App
+   • https://github.com/settings/apps/new
+   • Name: Archivist (or anything)
+   • Homepage: https://github.com/feralxr/archivist
+   • Webhook URL: https://YOUR_DOMAIN/api/github/webhooks
+     (use ngrok/cloudflared for local dev)
+   • Webhook secret: generate a random string
+   • Permissions:
+       - Repository permissions:
+           Pull requests: Read & Write
+           Contents: Read-only
+           Metadata: Read-only
+   • Subscribe to events:
+       - Pull request
+       - Pull request review
+   • Create the app → generate a Private Key
+
+3. Put credentials in .env
+   GITHUB_APP_ID=123456
+   GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\\n...\\n-----END RSA PRIVATE KEY-----"
+   GITHUB_WEBHOOK_SECRET=your_webhook_secret
+
+4. Install the app on a repository
+   • From the GitHub App page → Install App → choose repos
+
+5. Start the server
+   npm run dev:server
+
+6. Open a PR on an installed repo and watch Archivist review it.
+
+Current status:
+  OpenRouter key : ${hasOpenRouter() ? "✓ set" : "✗ missing"}
+  GitHub App     : ${hasGitHubApp() ? "✓ credentials present" : "✗ missing"}
+  Model          : ${env.ARCHIVIST_MODEL}
+`);
+  });
 
 program
   .command("init")
@@ -60,12 +113,15 @@ program
     console.log(`Updated    : ${memory.metadata.updatedAt}`);
     console.log(`Version    : ${memory.metadata.version}`);
     console.log(`PRs seen   : ${memory.metadata.prsAnalyzed}`);
+    if (memory.metadata.lastBootstrapAt) {
+      console.log(`Bootstrap  : ${memory.metadata.lastBootstrapAt}`);
+    }
     console.log("");
     console.log(`Style rules        : ${memory.styleRules.length}`);
     console.log(`Architecture notes : ${memory.architectureNotes.length}`);
     console.log(`Patterns           : ${memory.patterns.length}`);
     console.log(`Historical feedback: ${memory.historicalFeedback.length}`);
-    console.log(`Raw snippets       : ${memory.rawReviewSnippets.length}`);
+    console.log(`Raw snippets       : ${memory.rawSnippets.length}`);
 
     if (memory.styleRules.length) {
       console.log("\n--- Style Rules ---");
@@ -73,9 +129,7 @@ program
     }
     if (memory.architectureNotes.length) {
       console.log("\n--- Architecture ---");
-      memory.architectureNotes
-        .slice(0, 8)
-        .forEach((n) => console.log(`• ${n.note}`));
+      memory.architectureNotes.slice(0, 8).forEach((n) => console.log(`• ${n.note}`));
     }
     if (memory.patterns.length) {
       console.log("\n--- Patterns ---");
@@ -84,52 +138,49 @@ program
         console.log(`• [${tag}] ${p.description}`);
       });
     }
+    if (memory.historicalFeedback.length) {
+      console.log("\n--- Recurring Feedback ---");
+      memory.historicalFeedback
+        .sort((a, b) => b.frequency - a.frequency)
+        .slice(0, 8)
+        .forEach((f) => console.log(`• (${f.frequency}×) ${f.summary.slice(0, 100)}`));
+    }
   });
 
 program
   .command("memory:add")
   .description("Manually add knowledge to project memory")
-  .requiredOption(
-    "-t, --type <type>",
-    "style | architecture | preferred | discouraged"
-  )
+  .requiredOption("-t, --type <type>", "style | architecture | preferred | discouraged")
   .requiredOption("-c, --content <content>", "The rule or note")
   .action(async (opts) => {
     const repoId = process.cwd();
-    await memoryStore.getOrCreate(
-      repoId,
-      repoId.split(/[\\/]/).pop() || "repo"
-    );
-
-    const content = opts.content;
+    await memoryStore.getOrCreate(repoId, repoId.split(/[\\/]/).pop() || "repo");
 
     switch (opts.type) {
       case "style":
         await memoryStore.addStyleRule(repoId, {
-          rule: content,
+          rule: opts.content,
           source: "manual",
           confidence: 1,
         });
         break;
       case "architecture":
-        await memoryStore.addArchitectureNote(repoId, { note: content });
+        await memoryStore.addArchitectureNote(repoId, { note: opts.content });
         break;
       case "preferred":
         await memoryStore.addPattern(repoId, {
-          description: content,
+          description: opts.content,
           preferred: true,
         });
         break;
       case "discouraged":
         await memoryStore.addPattern(repoId, {
-          description: content,
+          description: opts.content,
           preferred: false,
         });
         break;
       default:
-        console.error(
-          "Type must be: style | architecture | preferred | discouraged"
-        );
+        console.error("Type must be: style | architecture | preferred | discouraged");
         process.exit(1);
     }
 
@@ -144,9 +195,7 @@ program
   .option("--title <title>", "PR title")
   .action(async (opts) => {
     if (!hasOpenRouter()) {
-      console.error(
-        "No OPENROUTER_API_KEY found.\nGet a free key at https://openrouter.ai"
-      );
+      console.error("No OPENROUTER_API_KEY found.\nGet a free key at https://openrouter.ai");
       process.exit(1);
     }
 
@@ -166,10 +215,7 @@ program
     }
 
     const repoId = process.cwd();
-    await memoryStore.getOrCreate(
-      repoId,
-      repoId.split(/[\\/]/).pop() || "repo"
-    );
+    await memoryStore.getOrCreate(repoId, repoId.split(/[\\/]/).pop() || "repo");
 
     const model = createModelFromEnv();
     const engine = new ReviewEngine(model);

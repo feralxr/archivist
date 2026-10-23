@@ -4,6 +4,7 @@ export interface StyleRule {
   examples?: string[];
   source?: "inferred" | "manual" | "review";
   confidence: number;
+  embedding?: number[];
 }
 
 export interface ArchitectureNote {
@@ -11,13 +12,15 @@ export interface ArchitectureNote {
   note: string;
   tags?: string[];
   source?: string;
+  embedding?: number[];
 }
 
 export interface Pattern {
   id: string;
   description: string;
-  preferred: boolean; // true = preferred, false = discouraged
+  preferred: boolean;
   examples?: string[];
+  embedding?: number[];
 }
 
 export interface HistoricalFeedback {
@@ -26,6 +29,17 @@ export interface HistoricalFeedback {
   prNumber?: number;
   frequency: number;
   lastSeen: string;
+  embedding?: number[];
+}
+
+export interface RawSnippet {
+  id: string;
+  text: string;
+  path?: string;
+  prNumber?: number;
+  author?: string;
+  createdAt: string;
+  embedding?: number[];
 }
 
 export interface ProjectMemory {
@@ -35,17 +49,19 @@ export interface ProjectMemory {
   architectureNotes: ArchitectureNote[];
   patterns: Pattern[];
   historicalFeedback: HistoricalFeedback[];
-  rawReviewSnippets: string[]; // recent high-signal review comments
+  rawSnippets: RawSnippet[];
   metadata: {
     createdAt: string;
     updatedAt: string;
     version: number;
     prsAnalyzed: number;
+    lastBootstrapAt?: string;
   };
 }
 
 export interface MemorySearchResult {
   content: string;
-  type: "style" | "architecture" | "pattern" | "feedback";
+  type: "style" | "architecture" | "pattern" | "feedback" | "snippet";
   score: number;
+  id?: string;
 }

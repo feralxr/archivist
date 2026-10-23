@@ -44,12 +44,15 @@ export function App() {
             <Text>Architecture notes: {memory.architectureNotes.length}</Text>
             <Text>Patterns: {memory.patterns.length}</Text>
             <Text>Historical feedback: {memory.historicalFeedback.length}</Text>
+            <Text>Raw snippets: {memory.rawSnippets.length}</Text>
           </Box>
         </Box>
       )}
 
       <Box marginTop={1}>
-        <Text dimColor>Commands: init | memory | memory:add | review | models | tui</Text>
+        <Text dimColor>
+          Commands: setup | init | memory | memory:add | review | models | tui
+        </Text>
       </Box>
     </Box>
   );

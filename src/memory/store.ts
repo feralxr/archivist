@@ -1,23 +1,25 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { env } from "../core/config.js";
+import { embed, cosine } from "./embeddings.js";
 import type {
   ProjectMemory,
   StyleRule,
   ArchitectureNote,
   Pattern,
   HistoricalFeedback,
+  RawSnippet,
   MemorySearchResult,
 } from "./types.js";
 
-const DATA_DIR = path.join(process.cwd(), ".archivist");
+const DATA_DIR = env.ARCHIVIST_DATA_DIR || path.join(process.cwd(), ".archivist");
 
 async function ensureDataDir() {
   await fs.mkdir(DATA_DIR, { recursive: true });
 }
 
 function memoryPath(repoId: string) {
-  // sanitize repoId for filesystem
   const safe = repoId.replace(/[^a-zA-Z0-9-_.]/g, "_");
   return path.join(DATA_DIR, `${safe}.json`);
 }
@@ -48,7 +50,7 @@ export class MemoryStore {
       architectureNotes: [],
       patterns: [],
       historicalFeedback: [],
-      rawReviewSnippets: [],
+      rawSnippets: [],
       metadata: {
         createdAt: now,
         updatedAt: now,
@@ -66,101 +68,114 @@ export class MemoryStore {
     return this.create(repoId, repoName);
   }
 
-  async addStyleRule(repoId: string, rule: Omit<StyleRule, "id">): Promise<void> {
+  async addStyleRule(repoId: string, rule: Omit<StyleRule, "id" | "embedding">): Promise<void> {
     const memory = await this.get(repoId);
     if (!memory) throw new Error(`No memory found for ${repoId}`);
-    memory.styleRules.push({ ...rule, id: randomUUID() });
+    const embedding = await embed(rule.rule);
+    memory.styleRules.push({ ...rule, id: randomUUID(), embedding: embedding ?? undefined });
     await this.save(memory);
   }
 
-  async addArchitectureNote(repoId: string, note: Omit<ArchitectureNote, "id">): Promise<void> {
+  async addArchitectureNote(repoId: string, note: Omit<ArchitectureNote, "id" | "embedding">): Promise<void> {
     const memory = await this.get(repoId);
     if (!memory) throw new Error(`No memory found for ${repoId}`);
-    memory.architectureNotes.push({ ...note, id: randomUUID() });
+    const embedding = await embed(note.note);
+    memory.architectureNotes.push({ ...note, id: randomUUID(), embedding: embedding ?? undefined });
     await this.save(memory);
   }
 
-  async addPattern(repoId: string, pattern: Omit<Pattern, "id">): Promise<void> {
+  async addPattern(repoId: string, pattern: Omit<Pattern, "id" | "embedding">): Promise<void> {
     const memory = await this.get(repoId);
     if (!memory) throw new Error(`No memory found for ${repoId}`);
-    memory.patterns.push({ ...pattern, id: randomUUID() });
+    const embedding = await embed(pattern.description);
+    memory.patterns.push({ ...pattern, id: randomUUID(), embedding: embedding ?? undefined });
     await this.save(memory);
   }
 
-  async addHistoricalFeedback(repoId: string, feedback: Omit<HistoricalFeedback, "id">): Promise<void> {
+  async addHistoricalFeedback(repoId: string, feedback: Omit<HistoricalFeedback, "id" | "embedding">): Promise<void> {
     const memory = await this.get(repoId);
     if (!memory) throw new Error(`No memory found for ${repoId}`);
-    memory.historicalFeedback.push({ ...feedback, id: randomUUID() });
+
+    const existing = memory.historicalFeedback.find(
+      (f) => f.summary.toLowerCase() === feedback.summary.toLowerCase()
+    );
+    if (existing) {
+      existing.frequency += 1;
+      existing.lastSeen = feedback.lastSeen;
+      await this.save(memory);
+      return;
+    }
+
+    const embedding = await embed(feedback.summary);
+    memory.historicalFeedback.push({
+      ...feedback,
+      id: randomUUID(),
+      embedding: embedding ?? undefined,
+    });
     await this.save(memory);
   }
 
-  async addRawSnippet(repoId: string, snippet: string): Promise<void> {
+  async addRawSnippet(repoId: string, snippet: Omit<RawSnippet, "id" | "embedding">): Promise<void> {
     const memory = await this.get(repoId);
     if (!memory) throw new Error(`No memory found for ${repoId}`);
-    memory.rawReviewSnippets.unshift(snippet);
-    // keep only recent high-signal snippets
-    memory.rawReviewSnippets = memory.rawReviewSnippets.slice(0, 50);
+    const embedding = await embed(snippet.text);
+    memory.rawSnippets.unshift({
+      ...snippet,
+      id: randomUUID(),
+      embedding: embedding ?? undefined,
+    });
+    memory.rawSnippets = memory.rawSnippets.slice(0, 100);
     await this.save(memory);
   }
 
-  /**
-   * Simple keyword + exact retrieval for now.
-   * Will be replaced with proper embeddings + vector search later.
-   */
   async search(repoId: string, query: string, limit = 12): Promise<MemorySearchResult[]> {
     const memory = await this.get(repoId);
     if (!memory) return [];
 
-    const q = query.toLowerCase();
+    const queryEmbedding = await embed(query);
     const results: MemorySearchResult[] = [];
 
-    for (const rule of memory.styleRules) {
-      const score = scoreMatch(rule.rule, q);
-      if (score > 0) results.push({ content: rule.rule, type: "style", score });
-    }
-    for (const note of memory.architectureNotes) {
-      const score = scoreMatch(note.note, q);
-      if (score > 0) results.push({ content: note.note, type: "architecture", score });
-    }
-    for (const pattern of memory.patterns) {
-      const score = scoreMatch(pattern.description, q);
-      if (score > 0) {
-        results.push({
-          content: `${pattern.preferred ? "Preferred" : "Discouraged"}: ${pattern.description}`,
-          type: "pattern",
-          score,
-        });
+    const push = (
+      content: string,
+      type: MemorySearchResult["type"],
+      itemEmbedding?: number[],
+      id?: string
+    ) => {
+      let score = 0;
+      if (queryEmbedding && itemEmbedding) {
+        score = cosine(queryEmbedding, itemEmbedding) * 10;
+      } else {
+        score = lexicalScore(content, query);
       }
+      if (score > 0.15) results.push({ content, type, score, id });
+    };
+
+    for (const r of memory.styleRules) push(r.rule, "style", r.embedding, r.id);
+    for (const n of memory.architectureNotes) push(n.note, "architecture", n.embedding, n.id);
+    for (const p of memory.patterns) {
+      const label = p.preferred ? "Preferred" : "Discouraged";
+      push(`${label}: ${p.description}`, "pattern", p.embedding, p.id);
     }
-    for (const fb of memory.historicalFeedback) {
-      const score = scoreMatch(fb.summary, q);
-      if (score > 0) results.push({ content: fb.summary, type: "feedback", score });
-    }
+    for (const f of memory.historicalFeedback) push(f.summary, "feedback", f.embedding, f.id);
+    for (const s of memory.rawSnippets.slice(0, 40)) push(s.text, "snippet", s.embedding, s.id);
 
     return results.sort((a, b) => b.score - a.score).slice(0, limit);
   }
 
-  /**
-   * Build a compact context string for the model.
-   */
   async buildContext(repoId: string, diffSnippet = ""): Promise<string> {
     const memory = await this.get(repoId);
     if (!memory) return "No project memory available yet.";
 
-    const relevant = diffSnippet
-      ? await this.search(repoId, diffSnippet, 8)
-      : [];
-
+    const relevant = diffSnippet ? await this.search(repoId, diffSnippet, 10) : [];
     const parts: string[] = [];
 
     if (memory.styleRules.length) {
       parts.push("### Style Rules");
-      parts.push(...memory.styleRules.slice(0, 15).map((r) => `- ${r.rule}`));
+      parts.push(...memory.styleRules.slice(0, 12).map((r) => `- ${r.rule}`));
     }
-
     if (memory.architectureNotes.length) {
       parts.push("\n### Architecture Notes");
-      parts.push(...memory.architectureNotes.slice(0, 10).map((n) => `- ${n.note}`));
+      parts.push(...memory.architectureNotes.slice(0, 8).map((n) => `- ${n.note}`));
     }
 
     const preferred = memory.patterns.filter((p) => p.preferred).slice(0, 8);
@@ -174,33 +189,31 @@ export class MemoryStore {
       parts.push("\n### Discouraged Patterns");
       parts.push(...discouraged.map((p) => `- ${p.description}`));
     }
-
     if (memory.historicalFeedback.length) {
       parts.push("\n### Recurring Review Feedback");
       parts.push(
         ...memory.historicalFeedback
+          .sort((a, b) => b.frequency - a.frequency)
           .slice(0, 8)
-          .map((f) => `- ${f.summary} (seen ${f.frequency} times)`)
+          .map((f) => `- ${f.summary} (seen ${f.frequency}×)`)
       );
     }
-
     if (relevant.length) {
-      parts.push("\n### Most Relevant to this diff");
-      parts.push(...relevant.map((r) => `- (${r.type}) ${r.content}`));
+      parts.push("\n### Most Relevant to this change");
+      parts.push(...relevant.map((r) => `- (${r.type}) ${r.content.slice(0, 220)}`));
     }
 
     return parts.length ? parts.join("\n") : "No project memory available yet.";
   }
 }
 
-function scoreMatch(text: string, query: string): number {
+function lexicalScore(text: string, query: string): number {
   const t = text.toLowerCase();
-  if (t.includes(query)) return 10;
-  const words = query.split(/\s+/).filter(Boolean);
+  const q = query.toLowerCase();
+  if (t.includes(q)) return 8;
+  const words = q.split(/\s+/).filter((w) => w.length > 2);
   let score = 0;
-  for (const w of words) {
-    if (t.includes(w)) score += 2;
-  }
+  for (const w of words) if (t.includes(w)) score += 1.5;
   return score;
 }
 

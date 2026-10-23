@@ -1,17 +1,14 @@
 import type { EmitterWebhookEvent } from "@octokit/webhooks";
-import { getInstallationOctokit } from "./app.js";
-import { createGitHubApp } from "./app.js";
+import { getInstallationOctokit, createGitHubApp } from "./app.js";
 import { ReviewEngine } from "../review/engine.js";
 import { createModelFromEnv } from "../models/provider.js";
 import { memoryStore } from "../memory/store.js";
 import { ingestPullRequest } from "./ingest.js";
 import { postReviewComments } from "./comments.js";
+import { hasOpenRouter } from "../core/config.js";
 
 type PREvent = EmitterWebhookEvent<"pull_request">;
 
-/**
- * Main entry point when a PR is opened or updated.
- */
 export async function handlePullRequestEvent(
   event: PREvent,
   action: "opened" | "synchronize"
@@ -26,6 +23,17 @@ export async function handlePullRequestEvent(
     return;
   }
 
+  if (!hasOpenRouter()) {
+    console.warn("[handler] No OPENROUTER_API_KEY — cannot review");
+    return;
+  }
+
+  // Skip draft PRs on open (still review on synchronize if desired)
+  if (action === "opened" && pr.draft) {
+    console.log(`[handler] Skipping draft PR ${repo.full_name}#${pr.number}`);
+    return;
+  }
+
   const repoId = String(repo.id);
   const repoFullName = repo.full_name;
 
@@ -34,25 +42,43 @@ export async function handlePullRequestEvent(
   );
 
   try {
-    // 1. Ensure memory exists
     await memoryStore.getOrCreate(repoId, repoFullName);
 
-    // 2. Get authenticated client
     const app = createGitHubApp();
     const octokit = await getInstallationOctokit(app, installationId);
 
-    // 3. Fetch the full diff
-    const { data: diff } = await octokit.pulls.get({
+    // Fetch diff
+    const response = await octokit.pulls.get({
       owner: repo.owner.login,
       repo: repo.name,
       pull_number: pr.number,
       mediaType: { format: "diff" },
     });
 
-    const diffText = typeof diff === "string" ? diff : String(diff);
+    const diffText =
+      typeof response.data === "string"
+        ? response.data
+        : String(response.data);
 
-    // 4. (Optional) Ingest past context / learn from this PR later
-    // For now we just make sure memory exists. Full ingestion comes next.
+    if (!diffText || diffText.length < 10) {
+      console.log("[handler] Empty diff — skipping");
+      return;
+    }
+
+    // Soft size guard for very large PRs
+    if (diffText.length > 400_000) {
+      console.warn(
+        `[handler] Diff too large (${diffText.length} chars) — skipping detailed review`
+      );
+      await octokit.issues.createComment({
+        owner: repo.owner.login,
+        repo: repo.name,
+        issue_number: pr.number,
+        body: "### Archivist\n\nThis PR is too large for a full automated review. Consider splitting it.",
+      });
+      return;
+    }
+
     if (action === "opened") {
       await ingestPullRequest(octokit, {
         owner: repo.owner.login,
@@ -62,7 +88,6 @@ export async function handlePullRequestEvent(
       });
     }
 
-    // 5. Run the review engine
     const model = createModelFromEnv();
     const engine = new ReviewEngine(model);
 
@@ -74,19 +99,16 @@ export async function handlePullRequestEvent(
     });
 
     console.log(
-      `[handler] Review complete → ${result.comments.length} comments | model: ${result.modelUsed}`
+      `[handler] Review complete → ${result.comments.length} comments | ${result.modelUsed}`
     );
 
-    // 6. Post comments back to the PR
-    if (result.comments.length > 0 || result.summary) {
-      await postReviewComments(octokit, {
-        owner: repo.owner.login,
-        repo: repo.name,
-        pullNumber: pr.number,
-        commitId: pr.head.sha,
-        result,
-      });
-    }
+    await postReviewComments(octokit, {
+      owner: repo.owner.login,
+      repo: repo.name,
+      pullNumber: pr.number,
+      commitId: pr.head.sha,
+      result,
+    });
   } catch (err) {
     console.error(`[handler] Failed on ${repoFullName}#${pr.number}`, err);
   }

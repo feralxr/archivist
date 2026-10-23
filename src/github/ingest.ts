@@ -10,7 +10,6 @@ interface IngestOptions {
 
 /**
  * Lightweight ingestion when a PR is opened.
- * Later this will pull historical PRs + review comments to bootstrap memory.
  */
 export async function ingestPullRequest(
   octokit: Octokit,
@@ -19,39 +18,25 @@ export async function ingestPullRequest(
   const { owner, repo, pullNumber, repoId } = options;
 
   try {
-    // Fetch the PR itself
-    const { data: pr } = await octokit.pulls.get({
-      owner,
-      repo,
-      pull_number: pullNumber,
-    });
-
-    // Fetch existing reviews (if any)
-    const { data: reviews } = await octokit.pulls.listReviews({
-      owner,
-      repo,
-      pull_number: pullNumber,
-    });
-
-    // Fetch review comments
     const { data: reviewComments } = await octokit.pulls.listReviewComments({
       owner,
       repo,
       pull_number: pullNumber,
     });
 
-    // Very simple bootstrap: store high-signal human comments as raw snippets
     for (const comment of reviewComments) {
       if (comment.user?.type === "Bot") continue;
       if (!comment.body || comment.body.length < 20) continue;
 
-      await memoryStore.addRawSnippet(
-        repoId,
-        `[${comment.path}] ${comment.body.slice(0, 300)}`
-      );
+      await memoryStore.addRawSnippet(repoId, {
+        text: comment.body,
+        path: comment.path,
+        prNumber: pullNumber,
+        author: comment.user?.login,
+        createdAt: comment.created_at,
+      });
     }
 
-    // Bump counter
     const memory = await memoryStore.get(repoId);
     if (memory) {
       memory.metadata.prsAnalyzed += 1;
@@ -59,7 +44,7 @@ export async function ingestPullRequest(
     }
 
     console.log(
-      `[ingest] Processed ${repo}/${pullNumber} — ${reviewComments.length} review comments`
+      `[ingest] Processed ${owner}/${repo}#${pullNumber} — ${reviewComments.length} comments`
     );
   } catch (err) {
     console.error("[ingest] Failed", err);
@@ -67,17 +52,19 @@ export async function ingestPullRequest(
 }
 
 /**
- * Future: full historical bootstrap
- * Pull the last N merged PRs + their review comments and extract patterns.
+ * Bootstrap memory from historical merged PRs.
+ * This is the key differentiator — learn the team's real preferences.
  */
 export async function bootstrapRepositoryMemory(
   octokit: Octokit,
   owner: string,
   repo: string,
   repoId: string,
-  limit = 30
+  limit = 40
 ) {
-  console.log(`[bootstrap] Starting historical analysis for ${owner}/${repo}`);
+  console.log(`[bootstrap] Analyzing last ${limit} PRs for ${owner}/${repo}...`);
+
+  await memoryStore.getOrCreate(repoId, `${owner}/${repo}`);
 
   const { data: pulls } = await octokit.pulls.list({
     owner,
@@ -85,10 +72,11 @@ export async function bootstrapRepositoryMemory(
     state: "closed",
     sort: "updated",
     direction: "desc",
-    per_page: limit,
+    per_page: Math.min(limit, 100),
   });
 
   let processed = 0;
+  let commentsIngested = 0;
 
   for (const pr of pulls) {
     if (!pr.merged_at) continue;
@@ -104,23 +92,43 @@ export async function bootstrapRepositoryMemory(
         if (comment.user?.type === "Bot") continue;
         if (!comment.body || comment.body.length < 30) continue;
 
-        await memoryStore.addRawSnippet(
-          repoId,
-          `[PR#${pr.number}] ${comment.path}: ${comment.body.slice(0, 280)}`
-        );
+        await memoryStore.addRawSnippet(repoId, {
+          text: comment.body,
+          path: comment.path,
+          prNumber: pr.number,
+          author: comment.user?.login,
+          createdAt: comment.created_at,
+        });
+
+        // Promote concise feedback
+        if (comment.body.length < 260) {
+          await memoryStore.addHistoricalFeedback(repoId, {
+            summary: comment.body.replace(/\s+/g, " ").trim().slice(0, 300),
+            prNumber: pr.number,
+            frequency: 1,
+            lastSeen: comment.created_at,
+          });
+        }
+
+        commentsIngested++;
       }
 
       processed++;
     } catch {
-      // ignore individual failures
+      // ignore individual PR failures
     }
   }
 
   const memory = await memoryStore.get(repoId);
   if (memory) {
     memory.metadata.prsAnalyzed = processed;
+    memory.metadata.lastBootstrapAt = new Date().toISOString();
     await memoryStore.save(memory);
   }
 
-  console.log(`[bootstrap] Finished — analyzed ${processed} merged PRs`);
+  console.log(
+    `[bootstrap] Done — ${processed} PRs, ${commentsIngested} comments ingested`
+  );
+
+  return { processed, commentsIngested };
 }

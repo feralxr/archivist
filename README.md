@@ -6,85 +6,61 @@ Archivist learns your codebase's style, architecture decisions, and historical r
 
 Built for large codebases and the shift to agentic coding.
 
-## What it does
+## Features
 
-Most AI review tools treat every PR in isolation.  
-Archivist builds and maintains a living **project memory**:
+- **Project Memory** — style rules, architecture notes, preferred/discouraged patterns, recurring human feedback
+- **Hybrid retrieval** — vector embeddings when available, strong lexical fallback
+- **Learns from humans** — ingests review comments and improves over time
+- **Historical bootstrap** — can analyze past merged PRs to seed memory
+- **Fully model-agnostic** — OpenRouter first (free models supported)
+- **GitHub App** — automatic reviews on PR open / update
+- **CLI + TUI** — local control and inspection
 
-- Style rules actually used in the repo  
-- Architecture decisions and constraints  
-- Preferred vs discouraged patterns  
-- Recurring human review feedback  
-
-This memory powers high-signal, low-noise reviews.
-
-## Current Status
-
-Core systems are implemented:
-
-- [x] Project memory system (local, expandable to Postgres + vectors)
-- [x] Fully model-agnostic layer (OpenRouter first — free models supported)
-- [x] Review engine with structured output
-- [x] CLI + TUI
-- [x] GitHub App foundation (webhooks, PR handling, comment posting)
-- [x] PR ingestion + historical bootstrap scaffolding
-- [ ] Production hardening & vector search
-- [ ] Public GitHub App listing
-
-## Quick Start (CLI)
+## Quick Start
 
 ```bash
-# Install deps
 npm install
-
-# Copy env and add your OpenRouter key (free models available)
 cp .env.example .env
+# Add OPENROUTER_API_KEY (get free key at https://openrouter.ai)
 
-# Initialize memory for the current repo
+npx tsx src/cli/index.ts setup          # full setup guide
 npx tsx src/cli/index.ts init
-
-# Add knowledge
-npx tsx src/cli/index.ts memory:add -t style -c "Prefer early returns over nested conditionals"
-npx tsx src/cli/index.ts memory:add -t preferred -c "Use Zod for all external input validation"
-
-# Review a diff
+npx tsx src/cli/index.ts memory:add -t style -c "Prefer early returns"
 npx tsx src/cli/index.ts review --file changes.diff
-
-# Inspect memory
-npx tsx src/cli/index.ts memory
 ```
 
 ## GitHub App
 
 ```bash
-# Start the webhook server
-npm run dev:server
+npx tsx src/cli/index.ts setup   # detailed instructions
+npm run dev:server               # start webhook server
 ```
 
-You will need:
-- A GitHub App (with Pull Requests + Webhooks permissions)
-- `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` in `.env`
+Required permissions: Pull requests (R/W), Contents (R), Metadata (R)  
+Events: `pull_request`, `pull_request_review`
 
 ## Architecture
 
 ```
 src/
-├── cli/            # CLI + TUI
-├── core/           # Shared types & config
-├── memory/         # Project memory system
-├── models/         # Model providers (OpenRouter first)
-├── review/         # Review engine + prompts
-├── github/         # GitHub App, handlers, ingestion, comments
-└── server.ts       # Webhook server entrypoint
+├── cli/           CLI + TUI
+├── core/          Config & types
+├── memory/        Project memory + embeddings + hybrid search
+├── models/        OpenRouter provider (pluggable)
+├── review/        Review engine + prompts
+├── github/        GitHub App, handlers, ingest, learn, comments
+└── server.ts      Webhook server
 ```
 
-## Design Goals
+## Status
 
-- Memory is the product, not the model
-- Extremely high signal / low noise
-- Built for large codebases
-- Fully pluggable models
-- Clean path to becoming infrastructure for agentic coding workflows
+P0 and P1 complete:
+- [x] Installable GitHub App foundation
+- [x] Secrets / config handling
+- [x] End-to-end review path
+- [x] Hybrid memory search (vector + lexical)
+- [x] Historical bootstrap
+- [x] Learning from human reviews
 
 ## License
 
