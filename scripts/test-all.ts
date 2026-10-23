@@ -51,7 +51,11 @@ function assertIncludes(hay: string, needle: string, msg?: string) {
   if (!hay.includes(needle)) throw new Error(msg || `Expected string to include "${needle}"`);
 }
 
-const hasKey = Boolean(process.env.OPENROUTER_API_KEY);
+const hasKey = Boolean(
+  process.env.OPENROUTER_API_KEY ||
+  process.env.ANTHROPIC_API_KEY ||
+  process.env.OPENAI_API_KEY
+);
 const RUN_LIVE = hasKey && process.env.ARCHIVIST_SKIP_LIVE !== "1";
 
 async function main() {
@@ -307,7 +311,7 @@ async function main() {
   test("models", "createModelFromEnv", () => {
     if (!hasKey) return;
     const model = createModelFromEnv();
-    assertEq(model.name, "openrouter");
+    assert(["openrouter", "openai", "anthropic"].includes(model.name), model.name);
   }, { live: true });
 
   // ── live ──
@@ -348,7 +352,7 @@ async function main() {
     assert(result.summary.length > 10, "summary");
     assert(Array.isArray(result.comments), "comments");
     assert(result.comments.length <= 8, "noise ceiling");
-    assert(result.modelUsed.includes("openrouter"), "model");
+    assert(result.modelUsed.length > 0, "model");
 
     for (const c of result.comments) {
       assert(c.path && c.body.length >= 10, "comment shape");
@@ -394,7 +398,7 @@ async function main() {
   console.log("╚══════════════════════════════════════════════════════╝");
   console.log(`Data dir : ${TEST_DATA}`);
   console.log(`Model    : ${env.ARCHIVIST_MODEL}`);
-  console.log(`Live API : ${RUN_LIVE ? "YES" : "NO (set OPENROUTER_API_KEY for live tests)"}`);
+  console.log(`Live API : ${RUN_LIVE ? "YES" : "NO (set OPENROUTER/ANTHROPIC/OPENAI key for live tests)"}`);
   console.log("");
 
   let passed = 0;
@@ -445,7 +449,7 @@ async function main() {
   }
 
   if (!RUN_LIVE) {
-    console.log("\nTip: set OPENROUTER_API_KEY in .env and re-run for live model tests.");
+    console.log("\nTip: set OPENROUTER_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY for live tests.");
   }
   console.log("\nAll executable tests passed.\n");
   process.exit(0);

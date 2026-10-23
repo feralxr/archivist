@@ -4,10 +4,17 @@ import { z } from "zod";
 loadEnv();
 
 const envSchema = z.object({
+  // Model providers — set at least one
   OPENROUTER_API_KEY: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+
+  /** Force provider: openrouter | anthropic | openai */
+  ARCHIVIST_PROVIDER: z.string().optional(),
   ARCHIVIST_MODEL: z.string().default("recursive/flint-v1.0:free"),
   ARCHIVIST_EMBEDDING_MODEL: z.string().default("openai/text-embedding-3-small"),
 
+  // GitHub App
   GITHUB_APP_ID: z.string().optional(),
   GITHUB_PRIVATE_KEY: z.string().optional(),
   GITHUB_WEBHOOK_SECRET: z.string().optional(),
@@ -16,7 +23,9 @@ const envSchema = z.object({
 
   DATABASE_URL: z.string().optional(),
 
-  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  NODE_ENV: z
+    .enum(["development", "production", "test"])
+    .default("development"),
   PORT: z.coerce.number().default(3000),
   ARCHIVIST_DATA_DIR: z.string().optional(),
 });
@@ -24,7 +33,10 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  console.error("Invalid environment variables:", parsed.error.flatten().fieldErrors);
+  console.error(
+    "Invalid environment variables:",
+    parsed.error.flatten().fieldErrors
+  );
   process.exit(1);
 }
 
@@ -32,6 +44,18 @@ export const env = parsed.data;
 
 export function hasOpenRouter(): boolean {
   return Boolean(env.OPENROUTER_API_KEY);
+}
+
+export function hasAnthropic(): boolean {
+  return Boolean(env.ANTHROPIC_API_KEY);
+}
+
+export function hasOpenAI(): boolean {
+  return Boolean(env.OPENAI_API_KEY);
+}
+
+export function hasAnyModelKey(): boolean {
+  return hasOpenRouter() || hasAnthropic() || hasOpenAI();
 }
 
 export function hasGitHubApp(): boolean {

@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { createGitHubApp, createWebhookMiddleware } from "./github/app.js";
-import { env, hasGitHubApp, hasOpenRouter } from "./core/config.js";
+import { env, hasGitHubApp, hasAnyModelKey } from "./core/config.js";
 import { log } from "./core/logger.js";
 import { reviewQueue } from "./core/queue.js";
 
@@ -18,8 +18,8 @@ async function main() {
     process.exit(1);
   }
 
-  if (!hasOpenRouter()) {
-    log.warn("OPENROUTER_API_KEY not set — reviews will be skipped");
+  if (!hasAnyModelKey()) {
+    log.warn("No model API key set — reviews will be skipped");
   }
 
   const app = createGitHubApp();
@@ -42,9 +42,9 @@ async function main() {
     }
 
     if (url === "/ready") {
-      const ready = hasGitHubApp() && hasOpenRouter();
+      const ready = hasGitHubApp() && hasAnyModelKey();
       res.writeHead(ready ? 200 : 503, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ready, githubApp: hasGitHubApp(), model: hasOpenRouter() }));
+      res.end(JSON.stringify({ ready, githubApp: hasGitHubApp(), model: hasAnyModelKey() }));
       return;
     }
 

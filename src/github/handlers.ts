@@ -5,7 +5,7 @@ import { createModelFromEnv } from "../models/provider.js";
 import { memoryStore } from "../memory/store.js";
 import { ingestPullRequest } from "./ingest.js";
 import { postReviewComments } from "./comments.js";
-import { hasOpenRouter } from "../core/config.js";
+import { hasAnyModelKey } from "../core/config.js";
 import { log } from "../core/logger.js";
 import { reviewQueue } from "../core/queue.js";
 import { withRetry } from "../core/retry.js";
@@ -55,8 +55,8 @@ export async function handlePullRequestEvent(
     return;
   }
 
-  if (!hasOpenRouter()) {
-    log.warn("No OPENROUTER_API_KEY — cannot review");
+  if (!hasAnyModelKey()) {
+    log.warn("No model API key (OpenRouter / Anthropic / OpenAI) — cannot review");
     return;
   }
 

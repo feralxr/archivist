@@ -5,7 +5,7 @@ import React from "react";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { App } from "./ui/App.js";
 import { createModelFromEnv } from "../models/provider.js";
-import { hasOpenRouter, hasGitHubApp, env } from "../core/config.js";
+import { hasOpenRouter, hasAnthropic, hasOpenAI, hasAnyModelKey, hasGitHubApp, env } from "../core/config.js";
 import { memoryStore } from "../memory/store.js";
 import { ReviewEngine } from "../review/engine.js";
 import { resolveLocalRepoIdentity, getGitDiff } from "../memory/identity.js";
@@ -27,9 +27,12 @@ program
     console.log(`
 Archivist setup
 ───────────────
-1. OpenRouter key → https://openrouter.ai (free models available)
-   OPENROUTER_API_KEY=...
-   ARCHIVIST_MODEL=recursive/flint-v1.0:free
+1. Model key (at least one)
+   OPENROUTER_API_KEY=...   # free models: https://openrouter.ai
+   ANTHROPIC_API_KEY=...    # Claude
+   OPENAI_API_KEY=...       # GPT
+   ARCHIVIST_PROVIDER=openai   # optional force
+   ARCHIVIST_MODEL=gpt-4o-mini
 
 2. Local workflow
    archivist init
@@ -41,7 +44,7 @@ Archivist setup
 3. GitHub App (automatic PR reviews)
    See docs/GITHUB_APP.md
 
-Status: OpenRouter ${hasOpenRouter() ? "✓" : "✗"}  GitHub App ${hasGitHubApp() ? "✓" : "✗"}  Model ${env.ARCHIVIST_MODEL}
+Status: OpenRouter ${hasOpenRouter() ? "✓" : "✗"}  Anthropic ${hasAnthropic() ? "✓" : "✗"}  OpenAI ${hasOpenAI() ? "✓" : "✗"}  App ${hasGitHubApp() ? "✓" : "✗"}
 `);
   });
 
@@ -53,9 +56,24 @@ program
     const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
 
     checks.push({
-      name: "OpenRouter API key",
+      name: "OpenRouter key",
       ok: hasOpenRouter(),
-      detail: hasOpenRouter() ? "set" : "missing — local review needs this",
+      detail: hasOpenRouter() ? "set" : "not set",
+    });
+    checks.push({
+      name: "Anthropic key",
+      ok: hasAnthropic(),
+      detail: hasAnthropic() ? "set" : "not set",
+    });
+    checks.push({
+      name: "OpenAI key",
+      ok: hasOpenAI(),
+      detail: hasOpenAI() ? "set" : "not set",
+    });
+    checks.push({
+      name: "Any model key",
+      ok: hasAnyModelKey(),
+      detail: hasAnyModelKey() ? "ok" : "missing — set OPENROUTER, ANTHROPIC, or OPENAI key",
     });
     checks.push({
       name: "GitHub App ID",
@@ -82,7 +100,7 @@ program
       checks.push({ name: "Git remote", ok: true, detail: remoteUrl });
     }
 
-    if (hasOpenRouter()) {
+    if (hasAnyModelKey()) {
       try {
         const model = createModelFromEnv();
         checks.push({
@@ -115,8 +133,11 @@ program
     const { repoId, repoName, remoteUrl } = resolveLocalRepoIdentity();
     console.log("\nConfiguration");
     console.log(`  OpenRouter : ${hasOpenRouter() ? "yes" : "no"}`);
+    console.log(`  Anthropic  : ${hasAnthropic() ? "yes" : "no"}`);
+    console.log(`  OpenAI     : ${hasOpenAI() ? "yes" : "no"}`);
     console.log(`  GitHub App : ${hasGitHubApp() ? "yes" : "no"}`);
     console.log(`  Model      : ${env.ARCHIVIST_MODEL}`);
+    if (env.ARCHIVIST_PROVIDER) console.log(`  Provider   : ${env.ARCHIVIST_PROVIDER}`);
     console.log(`  Repo       : ${repoName}`);
     if (remoteUrl) console.log(`  Remote     : ${remoteUrl}`);
 
@@ -322,9 +343,10 @@ program
   .option("--main", "Review diff against main/master")
   .option("--title <title>", "PR title context")
   .action(async (opts) => {
-    if (!hasOpenRouter()) {
+    if (!hasAnyModelKey()) {
       console.error(
-        "No OPENROUTER_API_KEY.\nGet a free key at https://openrouter.ai and set it in .env"
+        "No model API key found.\n" +
+          "Set OPENROUTER_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY in .env"
       );
       process.exit(1);
     }
@@ -405,8 +427,8 @@ program
   .command("models")
   .description("Show active model")
   .action(() => {
-    if (!hasOpenRouter()) {
-      console.log("No OpenRouter API key. Set OPENROUTER_API_KEY in .env");
+    if (!hasAnyModelKey()) {
+      console.log("No model API key. Set OPENROUTER_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY.");
       return;
     }
     const model = createModelFromEnv();
