@@ -3,6 +3,7 @@ import { Box, Text, useInput, useApp } from "ink";
 import { memoryStore } from "../../memory/store.js";
 import type { ProjectMemory } from "../../memory/types.js";
 import { hasOpenRouter, hasGitHubApp, env } from "../../core/config.js";
+import { resolveLocalRepoIdentity } from "../../memory/identity.js";
 
 type Tab = "overview" | "style" | "architecture" | "patterns" | "feedback";
 
@@ -11,13 +12,14 @@ export function App() {
   const [memory, setMemory] = useState<ProjectMemory | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("overview");
+  const identity = resolveLocalRepoIdentity();
 
   useEffect(() => {
-    memoryStore.get(process.cwd()).then((m) => {
+    memoryStore.get(identity.repoId).then((m) => {
       setMemory(m);
       setLoading(false);
     });
-  }, []);
+  }, [identity.repoId]);
 
   useInput((input, key) => {
     if (input === "q" || key.escape) exit();
@@ -34,7 +36,7 @@ export function App() {
         <Text bold color="cyan">
           Archivist
         </Text>
-        <Text dimColor>  project memory inspector</Text>
+        <Text dimColor>  project memory</Text>
       </Box>
 
       <Box marginBottom={1}>
@@ -42,7 +44,7 @@ export function App() {
         <Text> </Text>
         <TabLabel id="2" label="Style" active={tab === "style"} />
         <Text> </Text>
-        <TabLabel id="3" label="Architecture" active={tab === "architecture"} />
+        <TabLabel id="3" label="Arch" active={tab === "architecture"} />
         <Text> </Text>
         <TabLabel id="4" label="Patterns" active={tab === "patterns"} />
         <Text> </Text>
@@ -53,21 +55,27 @@ export function App() {
         <Text>Loading...</Text>
       ) : !memory ? (
         <Box flexDirection="column">
-          <Text color="yellow">No project memory found.</Text>
-          <Text dimColor>Run `archivist init` to create one.</Text>
+          <Text color="yellow">No memory for {identity.repoName}.</Text>
+          <Text dimColor>Run archivist init</Text>
         </Box>
       ) : (
         <Box flexDirection="column">
           {tab === "overview" && <Overview memory={memory} />}
-          {tab === "style" && <List title="Style Rules" items={memory.styleRules.map((r) => r.rule)} />}
+          {tab === "style" && (
+            <List title="Style Rules" items={memory.styleRules.map((r) => r.rule)} />
+          )}
           {tab === "architecture" && (
-            <List title="Architecture Notes" items={memory.architectureNotes.map((n) => n.note)} />
+            <List
+              title="Architecture"
+              items={memory.architectureNotes.map((n) => n.note)}
+            />
           )}
           {tab === "patterns" && (
             <List
               title="Patterns"
               items={memory.patterns.map(
-                (p) => `[${p.preferred ? "preferred" : "discouraged"}] ${p.description}`
+                (p) =>
+                  `[${p.preferred ? "preferred" : "discouraged"}] ${p.description}`
               )}
             />
           )}
@@ -84,15 +92,23 @@ export function App() {
 
       <Box marginTop={1}>
         <Text dimColor>
-          [1-5] tabs  [q] quit  |  OpenRouter: {hasOpenRouter() ? "✓" : "✗"}  GitHub App:{" "}
-          {hasGitHubApp() ? "✓" : "✗"}  Model: {env.ARCHIVIST_MODEL}
+          [1-5] tabs [q] quit · OR:{hasOpenRouter() ? "✓" : "✗"} App:
+          {hasGitHubApp() ? "✓" : "✗"} · {env.ARCHIVIST_MODEL}
         </Text>
       </Box>
     </Box>
   );
 }
 
-function TabLabel({ id, label, active }: { id: string; label: string; active: boolean }) {
+function TabLabel({
+  id,
+  label,
+  active,
+}: {
+  id: string;
+  label: string;
+  active: boolean;
+}) {
   return (
     <Text color={active ? "cyan" : undefined} bold={active} inverse={active}>
       {id}:{label}
@@ -104,13 +120,11 @@ function Overview({ memory }: { memory: ProjectMemory }) {
   return (
     <Box flexDirection="column">
       <Text>
-        Repository: <Text bold>{memory.repoName}</Text>
+        <Text bold>{memory.repoName}</Text>
+        {memory.remoteUrl ? <Text dimColor> · {memory.remoteUrl}</Text> : null}
       </Text>
       <Text>
-        Version {memory.metadata.version} · PRs analyzed {memory.metadata.prsAnalyzed}
-        {memory.metadata.lastBootstrapAt
-          ? ` · Bootstrapped ${memory.metadata.lastBootstrapAt.slice(0, 10)}`
-          : ""}
+        v{memory.metadata.version} · {memory.metadata.prsAnalyzed} PRs
       </Text>
       <Box marginTop={1} flexDirection="column">
         <Text>Style rules          {memory.styleRules.length}</Text>
@@ -135,7 +149,9 @@ function List({ title, items }: { title: string; items: string[] }) {
           • {item.length > 100 ? item.slice(0, 100) + "…" : item}
         </Text>
       ))}
-      {items.length > 15 && <Text dimColor>…and {items.length - 15} more</Text>}
+      {items.length > 15 && (
+        <Text dimColor>…and {items.length - 15} more</Text>
+      )}
     </Box>
   );
 }

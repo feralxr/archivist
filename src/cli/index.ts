@@ -2,113 +2,84 @@
 import { Command } from "commander";
 import { render } from "ink";
 import React from "react";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { App } from "./ui/App.js";
 import { createModelFromEnv } from "../models/provider.js";
 import { hasOpenRouter, hasGitHubApp, env } from "../core/config.js";
 import { memoryStore } from "../memory/store.js";
 import { ReviewEngine } from "../review/engine.js";
+import { resolveLocalRepoIdentity, getGitDiff } from "../memory/identity.js";
 
 const program = new Command();
 
 program
   .name("archivist")
-  .description("Intelligent code review agent with deep project memory")
+  .description("Memory-aware code review — local CLI and GitHub App")
   .version("0.1.0");
+
+// ── Setup / health ──────────────────────────────────────────
 
 program
   .command("setup")
-  .description("Show setup instructions for GitHub App + models")
+  .description("Show setup instructions")
   .action(() => {
     console.log(`
-╔══════════════════════════════════════════════════════════╗
-║                 Archivist Setup Guide                    ║
-╚══════════════════════════════════════════════════════════╝
+Archivist setup
+───────────────
+1. OpenRouter key → https://openrouter.ai (free models available)
+   OPENROUTER_API_KEY=...
+   ARCHIVIST_MODEL=recursive/flint-v1.0:free
 
-1. OpenRouter (required for reviews)
-   • https://openrouter.ai → Keys
-   • Create a key (free models available)
-   • Add to .env:
-       OPENROUTER_API_KEY=sk-or-...
-       ARCHIVIST_MODEL=recursive/flint-v1.0:free
+2. Local workflow
+   archivist init
+   archivist memory:add -t style -c "Prefer early returns"
+   archivist review              # reviews current git diff
+   archivist review --staged
+   archivist review --file changes.diff
 
-2. Create a GitHub App
-   • https://github.com/settings/apps/new
-   • Homepage: https://github.com/feralxr/archivist
-   • Webhook URL: https://YOUR_DOMAIN/api/github/webhooks
-     (use ngrok or cloudflared for local dev)
-   • Webhook secret: random string
-   • Permissions:
-       Pull requests: Read & Write
-       Contents: Read-only
-       Metadata: Read-only
-   • Events: Pull request, Pull request review
-   • Generate a Private Key after creating
+3. GitHub App (automatic PR reviews)
+   See docs/GITHUB_APP.md
 
-3. Put credentials in .env
-   GITHUB_APP_ID=123456
-   GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\\n...\\n-----END RSA PRIVATE KEY-----"
-   GITHUB_WEBHOOK_SECRET=your_webhook_secret
-
-4. Install the app on a repository (GitHub App page → Install)
-
-5. Start server
-   npm run dev:server
-
-Current status:
-  OpenRouter : ${hasOpenRouter() ? "✓ set" : "✗ missing"}
-  GitHub App : ${hasGitHubApp() ? "✓ credentials present" : "✗ missing"}
-  Model      : ${env.ARCHIVIST_MODEL}
+Status: OpenRouter ${hasOpenRouter() ? "✓" : "✗"}  GitHub App ${hasGitHubApp() ? "✓" : "✗"}  Model ${env.ARCHIVIST_MODEL}
 `);
   });
 
 program
   .command("doctor")
-  .description("Check configuration and environment health")
+  .description("Check configuration health")
   .action(async () => {
     console.log("\nArchivist Doctor\n");
-
     const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
 
     checks.push({
       name: "OpenRouter API key",
       ok: hasOpenRouter(),
-      detail: hasOpenRouter() ? "set" : "missing — reviews will not work",
+      detail: hasOpenRouter() ? "set" : "missing — local review needs this",
     });
-
     checks.push({
       name: "GitHub App ID",
       ok: Boolean(env.GITHUB_APP_ID),
-      detail: env.GITHUB_APP_ID ? `set (${env.GITHUB_APP_ID})` : "missing",
+      detail: env.GITHUB_APP_ID ? String(env.GITHUB_APP_ID) : "missing (only needed for server)",
     });
-
     checks.push({
       name: "GitHub Private Key",
       ok: Boolean(env.GITHUB_PRIVATE_KEY),
-      detail: env.GITHUB_PRIVATE_KEY ? "set" : "missing",
+      detail: env.GITHUB_PRIVATE_KEY ? "set" : "missing (only needed for server)",
     });
+    checks.push({ name: "Model", ok: true, detail: env.ARCHIVIST_MODEL });
 
-    checks.push({
-      name: "Webhook secret",
-      ok: Boolean(env.GITHUB_WEBHOOK_SECRET),
-      detail: env.GITHUB_WEBHOOK_SECRET ? "set" : "not set (ok for local test)",
-    });
-
-    checks.push({
-      name: "Model",
-      ok: true,
-      detail: env.ARCHIVIST_MODEL,
-    });
-
-    const repoId = process.cwd();
+    const { repoId, repoName, remoteUrl } = resolveLocalRepoIdentity();
     const memory = await memoryStore.get(repoId);
     checks.push({
-      name: "Local project memory",
+      name: "Project memory",
       ok: Boolean(memory),
       detail: memory
-        ? `${memory.repoName} (v${memory.metadata.version}, ${memory.metadata.prsAnalyzed} PRs)`
-        : "none — run `archivist init`",
+        ? `${memory.repoName} v${memory.metadata.version}`
+        : `none for ${repoName} — run archivist init`,
     });
+    if (remoteUrl) {
+      checks.push({ name: "Git remote", ok: true, detail: remoteUrl });
+    }
 
     if (hasOpenRouter()) {
       try {
@@ -128,74 +99,75 @@ program
     }
 
     for (const c of checks) {
-      const mark = c.ok ? "✓" : "✗";
-      console.log(`  ${mark}  ${c.name.padEnd(22)} ${c.detail}`);
+      console.log(`  ${c.ok ? "✓" : "✗"}  ${c.name.padEnd(20)} ${c.detail}`);
     }
-
     const failed = checks.filter((c) => !c.ok).length;
     console.log(
-      failed === 0
-        ? "\nAll critical checks passed.\n"
-        : `\n${failed} issue(s) found. Run \`archivist setup\` for help.\n`
+      failed === 0 ? "\nAll good.\n" : `\n${failed} issue(s). Run archivist setup.\n`
     );
   });
 
 program
   .command("status")
-  .description("Show current configuration and memory summary")
+  .description("Config + memory summary")
   .action(async () => {
+    const { repoId, repoName, remoteUrl } = resolveLocalRepoIdentity();
     console.log("\nConfiguration");
     console.log(`  OpenRouter : ${hasOpenRouter() ? "yes" : "no"}`);
     console.log(`  GitHub App : ${hasGitHubApp() ? "yes" : "no"}`);
     console.log(`  Model      : ${env.ARCHIVIST_MODEL}`);
-    console.log(`  Port       : ${env.PORT}`);
-    console.log(`  Env        : ${env.NODE_ENV}`);
+    console.log(`  Repo       : ${repoName}`);
+    if (remoteUrl) console.log(`  Remote     : ${remoteUrl}`);
 
-    const memory = await memoryStore.get(process.cwd());
+    const stats = await memoryStore.stats(repoId);
     console.log("\nProject Memory");
-    if (!memory) {
+    if (!stats) {
       console.log("  (none — run archivist init)");
     } else {
-      console.log(`  Repo       : ${memory.repoName}`);
-      console.log(`  Version    : ${memory.metadata.version}`);
-      console.log(`  PRs        : ${memory.metadata.prsAnalyzed}`);
-      console.log(`  Style      : ${memory.styleRules.length}`);
-      console.log(`  Arch       : ${memory.architectureNotes.length}`);
-      console.log(`  Patterns   : ${memory.patterns.length}`);
-      console.log(`  Feedback   : ${memory.historicalFeedback.length}`);
-      console.log(`  Snippets   : ${memory.rawSnippets.length}`);
+      console.log(`  Version              ${stats.version}`);
+      console.log(`  Style rules          ${stats.styleRules}`);
+      console.log(`  Architecture notes   ${stats.architectureNotes}`);
+      console.log(`  Preferred patterns   ${stats.preferredPatterns}`);
+      console.log(`  Discouraged patterns ${stats.discouragedPatterns}`);
+      console.log(`  Historical feedback  ${stats.historicalFeedback}`);
+      console.log(`  Raw snippets         ${stats.rawSnippets}`);
+      console.log(`  PRs analyzed         ${stats.prsAnalyzed}`);
+      console.log(`  Embeddings           ${stats.hasEmbeddings ? "yes" : "no"}`);
     }
     console.log("");
   });
 
+// ── Memory ──────────────────────────────────────────────────
+
 program
   .command("init")
-  .description("Initialize Archivist memory for this repository")
-  .option("-n, --name <name>", "Repository name")
+  .description("Initialize project memory for this repo")
+  .option("-n, --name <name>", "Repository name override")
   .action(async (opts) => {
-    const repoId = process.cwd();
-    const repoName = opts.name || repoId.split(/[\\/]/).pop() || "unknown";
+    const { repoId, repoName, remoteUrl } = resolveLocalRepoIdentity();
+    const name = opts.name || repoName;
 
     const existing = await memoryStore.get(repoId);
     if (existing) {
-      console.log(`Memory already exists for: ${existing.repoName}`);
+      console.log(`Memory already exists: ${existing.repoName}`);
       console.log(
-        `Version: ${existing.metadata.version} | PRs analyzed: ${existing.metadata.prsAnalyzed}`
+        `Version ${existing.metadata.version} · ${existing.metadata.prsAnalyzed} PRs analyzed`
       );
       return;
     }
 
-    const memory = await memoryStore.create(repoId, repoName);
-    console.log(`✓ Created project memory for: ${memory.repoName}`);
-    console.log(`  Data stored in .archivist/`);
+    const memory = await memoryStore.create(repoId, name, remoteUrl);
+    console.log(`✓ Created memory for ${memory.repoName}`);
+    if (remoteUrl) console.log(`  Remote: ${remoteUrl}`);
+    console.log(`  Data:  .archivist/`);
   });
 
 program
   .command("memory")
   .description("Inspect project memory")
-  .option("--json", "Output raw JSON")
+  .option("--json", "Raw JSON")
   .action(async (opts) => {
-    const repoId = process.cwd();
+    const { repoId } = resolveLocalRepoIdentity();
     const memory = await memoryStore.get(repoId);
 
     if (!memory) {
@@ -208,23 +180,25 @@ program
       return;
     }
 
-    console.log(`\nRepository : ${memory.repoName}`);
-    console.log(`Updated    : ${memory.metadata.updatedAt}`);
-    console.log(`Version    : ${memory.metadata.version}`);
-    console.log(`PRs seen   : ${memory.metadata.prsAnalyzed}`);
-    if (memory.metadata.lastBootstrapAt) {
-      console.log(`Bootstrap  : ${memory.metadata.lastBootstrapAt}`);
-    }
+    console.log(`\n${memory.repoName}`);
+    if (memory.remoteUrl) console.log(`Remote   : ${memory.remoteUrl}`);
+    console.log(`Updated  : ${memory.metadata.updatedAt}`);
+    console.log(`Version  : ${memory.metadata.version}`);
+    console.log(`PRs      : ${memory.metadata.prsAnalyzed}`);
+    if (memory.metadata.lastBootstrapAt)
+      console.log(`Bootstrap: ${memory.metadata.lastBootstrapAt}`);
+    if (memory.metadata.lastConsolidatedAt)
+      console.log(`Consolidate: ${memory.metadata.lastConsolidatedAt}`);
     console.log("");
-    console.log(`Style rules        : ${memory.styleRules.length}`);
-    console.log(`Architecture notes : ${memory.architectureNotes.length}`);
-    console.log(`Patterns           : ${memory.patterns.length}`);
-    console.log(`Historical feedback: ${memory.historicalFeedback.length}`);
-    console.log(`Raw snippets       : ${memory.rawSnippets.length}`);
+    console.log(`Style rules          ${memory.styleRules.length}`);
+    console.log(`Architecture notes   ${memory.architectureNotes.length}`);
+    console.log(`Patterns             ${memory.patterns.length}`);
+    console.log(`Historical feedback  ${memory.historicalFeedback.length}`);
+    console.log(`Raw snippets         ${memory.rawSnippets.length}`);
 
     if (memory.styleRules.length) {
-      console.log("\n--- Style Rules ---");
-      memory.styleRules.slice(0, 10).forEach((r) => console.log(`• ${r.rule}`));
+      console.log("\n--- Style ---");
+      memory.styleRules.slice(0, 12).forEach((r) => console.log(`• ${r.rule}`));
     }
     if (memory.architectureNotes.length) {
       console.log("\n--- Architecture ---");
@@ -232,28 +206,28 @@ program
     }
     if (memory.patterns.length) {
       console.log("\n--- Patterns ---");
-      memory.patterns.slice(0, 10).forEach((p) => {
-        const tag = p.preferred ? "preferred" : "discouraged";
-        console.log(`• [${tag}] ${p.description}`);
+      memory.patterns.slice(0, 12).forEach((p) => {
+        console.log(`• [${p.preferred ? "preferred" : "discouraged"}] ${p.description}`);
       });
     }
     if (memory.historicalFeedback.length) {
-      console.log("\n--- Recurring Feedback ---");
+      console.log("\n--- Recurring feedback ---");
       memory.historicalFeedback
         .sort((a, b) => b.frequency - a.frequency)
-        .slice(0, 8)
-        .forEach((f) => console.log(`• (${f.frequency}×) ${f.summary.slice(0, 100)}`));
+        .slice(0, 10)
+        .forEach((f) => console.log(`• (${f.frequency}×) ${f.summary.slice(0, 120)}`));
     }
+    console.log("");
   });
 
 program
   .command("memory:add")
-  .description("Manually add knowledge to project memory")
+  .description("Add knowledge to project memory")
   .requiredOption("-t, --type <type>", "style | architecture | preferred | discouraged")
   .requiredOption("-c, --content <content>", "The rule or note")
   .action(async (opts) => {
-    const repoId = process.cwd();
-    await memoryStore.getOrCreate(repoId, repoId.split(/[\\/]/).pop() || "repo");
+    const { repoId, repoName, remoteUrl } = resolveLocalRepoIdentity();
+    await memoryStore.getOrCreate(repoId, repoName, remoteUrl);
 
     switch (opts.type) {
       case "style":
@@ -282,19 +256,70 @@ program
         console.error("Type must be: style | architecture | preferred | discouraged");
         process.exit(1);
     }
-
-    console.log(`✓ Added ${opts.type} to memory`);
+    console.log(`✓ Added ${opts.type}`);
   });
 
 program
+  .command("memory:consolidate")
+  .description("Merge duplicate feedback and trim low-value snippets")
+  .action(async () => {
+    const { repoId } = resolveLocalRepoIdentity();
+    try {
+      const result = await memoryStore.consolidate(repoId);
+      console.log(
+        `✓ Consolidated — merged ${result.merged} feedback items, trimmed ${result.trimmed} snippets`
+      );
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("memory:export")
+  .description("Export project memory to a JSON file")
+  .option("-o, --out <path>", "Output path", "archivist-memory.json")
+  .action(async (opts) => {
+    const { repoId } = resolveLocalRepoIdentity();
+    const memory = await memoryStore.exportJSON(repoId);
+    if (!memory) {
+      console.error("No memory found. Run archivist init first.");
+      process.exit(1);
+    }
+    writeFileSync(opts.out, JSON.stringify(memory, null, 2), "utf-8");
+    console.log(`✓ Exported to ${opts.out}`);
+  });
+
+program
+  .command("memory:import")
+  .description("Import project memory from a JSON file")
+  .requiredOption("-f, --file <path>", "JSON file path")
+  .action(async (opts) => {
+    if (!existsSync(opts.file)) {
+      console.error(`File not found: ${opts.file}`);
+      process.exit(1);
+    }
+    const raw = JSON.parse(readFileSync(opts.file, "utf-8"));
+    await memoryStore.importJSON(raw);
+    console.log(`✓ Imported memory for ${raw.repoName || raw.repoId}`);
+  });
+
+// ── Review (local) ──────────────────────────────────────────
+
+program
   .command("review")
-  .description("Review a diff using project memory")
+  .description("Review a diff using project memory (local)")
   .option("-f, --file <path>", "Path to a diff file")
   .option("-d, --diff <diff>", "Raw diff string")
-  .option("--title <title>", "PR title")
+  .option("--staged", "Review staged changes only")
+  .option("--unstaged", "Review unstaged changes only")
+  .option("--main", "Review diff against main/master")
+  .option("--title <title>", "PR title context")
   .action(async (opts) => {
     if (!hasOpenRouter()) {
-      console.error("No OPENROUTER_API_KEY found.\nGet a free key at https://openrouter.ai");
+      console.error(
+        "No OPENROUTER_API_KEY.\nGet a free key at https://openrouter.ai and set it in .env"
+      );
       process.exit(1);
     }
 
@@ -309,24 +334,39 @@ program
     }
 
     if (!diff) {
-      console.error("Provide a diff with --file or --diff");
-      process.exit(1);
+      const mode = opts.staged
+        ? "staged"
+        : opts.unstaged
+          ? "unstaged"
+          : opts.main
+            ? "main"
+            : "all";
+      diff = getGitDiff(process.cwd(), mode);
+      if (!diff || diff.trim().length < 5) {
+        console.error(
+          "No diff found. Commit status is clean, or pass --file / --diff."
+        );
+        process.exit(1);
+      }
+      console.log(`Using git diff (${mode}) · ${diff.length} chars`);
     }
 
-    const repoId = process.cwd();
-    await memoryStore.getOrCreate(repoId, repoId.split(/[\\/]/).pop() || "repo");
+    const { repoId, repoName, remoteUrl } = resolveLocalRepoIdentity();
+    await memoryStore.getOrCreate(repoId, repoName, remoteUrl);
 
     const model = createModelFromEnv();
     const engine = new ReviewEngine(model);
 
-    console.log(`\nModel : ${model.name} / ${model.model}`);
+    console.log(`Model : ${model.name} / ${model.model}`);
     console.log("Reviewing...\n");
 
+    const started = Date.now();
     const result = await engine.review({
       repoId,
       diff,
       title: opts.title,
     });
+    const ms = Date.now() - started;
 
     console.log("=== Summary ===");
     console.log(result.summary);
@@ -338,21 +378,29 @@ program
       console.log(`=== Comments (${result.comments.length}) ===\n`);
       for (const c of result.comments) {
         const loc = c.line ? `${c.path}:${c.line}` : c.path;
-        console.log(`[${c.severity.toUpperCase()}] ${loc} (${c.category})`);
+        const badge =
+          c.severity === "error"
+            ? "ERROR"
+            : c.severity === "warning"
+              ? "WARN"
+              : c.severity === "suggestion"
+                ? "SUGGEST"
+                : "INFO";
+        console.log(`[${badge}] ${loc} (${c.category})`);
         console.log(`  ${c.body}`);
-        if (c.explanation) console.log(`  → ${c.explanation}`);
+        if (c.explanation) console.log(`  why: ${c.explanation}`);
         console.log("");
       }
     }
+    console.log(`Done in ${ms}ms · ${result.modelUsed}`);
   });
 
 program
   .command("models")
-  .description("Show current model configuration")
-  .action(async () => {
+  .description("Show active model")
+  .action(() => {
     if (!hasOpenRouter()) {
-      console.log("No OpenRouter API key configured.");
-      console.log("Set OPENROUTER_API_KEY in .env");
+      console.log("No OpenRouter API key. Set OPENROUTER_API_KEY in .env");
       return;
     }
     const model = createModelFromEnv();
@@ -362,7 +410,7 @@ program
 
 program
   .command("tui")
-  .description("Launch the interactive TUI")
+  .description("Interactive memory inspector")
   .action(() => {
     render(React.createElement(App));
   });

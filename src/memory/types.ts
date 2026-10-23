@@ -5,6 +5,8 @@ export interface StyleRule {
   source?: "inferred" | "manual" | "review";
   confidence: number;
   embedding?: number[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ArchitectureNote {
@@ -13,6 +15,7 @@ export interface ArchitectureNote {
   tags?: string[];
   source?: string;
   embedding?: number[];
+  createdAt?: string;
 }
 
 export interface Pattern {
@@ -21,6 +24,7 @@ export interface Pattern {
   preferred: boolean;
   examples?: string[];
   embedding?: number[];
+  createdAt?: string;
 }
 
 export interface HistoricalFeedback {
@@ -45,6 +49,8 @@ export interface RawSnippet {
 export interface ProjectMemory {
   repoId: string;
   repoName: string;
+  /** Optional canonical remote, e.g. github.com/org/repo */
+  remoteUrl?: string;
   styleRules: StyleRule[];
   architectureNotes: ArchitectureNote[];
   patterns: Pattern[];
@@ -56,6 +62,7 @@ export interface ProjectMemory {
     version: number;
     prsAnalyzed: number;
     lastBootstrapAt?: string;
+    lastConsolidatedAt?: string;
   };
 }
 
@@ -64,4 +71,16 @@ export interface MemorySearchResult {
   type: "style" | "architecture" | "pattern" | "feedback" | "snippet";
   score: number;
   id?: string;
+}
+
+export interface MemoryStats {
+  styleRules: number;
+  architectureNotes: number;
+  preferredPatterns: number;
+  discouragedPatterns: number;
+  historicalFeedback: number;
+  rawSnippets: number;
+  prsAnalyzed: number;
+  version: number;
+  hasEmbeddings: boolean;
 }
