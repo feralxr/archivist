@@ -2,20 +2,40 @@
  * Core shared types for Archivist
  */
 
+export type ModelProvider =
+  | "openrouter"
+  | "anthropic"
+  | "openai"
+  | "google"
+  | "custom";
+
 export interface ModelConfig {
-  provider: "openrouter" | "anthropic" | "openai" | "google" | "custom";
+  provider: ModelProvider;
   model: string;
   apiKey?: string;
   baseUrl?: string;
 }
 
+export type CommentSeverity = "info" | "warning" | "error" | "suggestion";
+
+export type CommentCategory =
+  | "style"
+  | "architecture"
+  | "history"
+  | "bug"
+  | "refactor"
+  | "security"
+  | "performance"
+  | "other";
+
 export interface ReviewComment {
   path: string;
   line?: number;
   body: string;
-  severity: "info" | "warning" | "error" | "suggestion";
-  category: "style" | "architecture" | "history" | "bug" | "refactor" | "other";
-  explanation?: string; // Why this comment was made (from project memory)
+  severity: CommentSeverity;
+  category: CommentCategory;
+  /** Why this comment was made (linked to project memory) */
+  explanation?: string;
 }
 
 export interface ProjectMemorySnapshot {
@@ -26,4 +46,10 @@ export interface ProjectMemorySnapshot {
   discouragedPatterns: string[];
   historicalFeedback: string[];
   lastUpdated: string;
+}
+
+export interface ReviewResult {
+  comments: ReviewComment[];
+  summary: string;
+  modelUsed: string;
 }

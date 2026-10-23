@@ -3,6 +3,8 @@ import { Command } from "commander";
 import { render } from "ink";
 import React from "react";
 import { App } from "./ui/App.js";
+import { createModelFromEnv } from "../models/provider.js";
+import { hasOpenRouter } from "../core/config.js";
 
 const program = new Command();
 
@@ -27,10 +29,47 @@ program
 
 program
   .command("review")
-  .description("Manually trigger a review")
+  .description("Manually trigger a review (experimental)")
   .argument("[pr]", "PR number or URL")
-  .action(async (pr) => {
-    console.log("Archivist review — coming soon", pr ?? "");
+  .option("-m, --model <model>", "Override model")
+  .action(async (pr, options) => {
+    if (!hasOpenRouter()) {
+      console.error(
+        "No OPENROUTER_API_KEY found.\n" +
+          "Get a free key at https://openrouter.ai and add it to your .env"
+      );
+      process.exit(1);
+    }
+
+    try {
+      const model = createModelFromEnv();
+      console.log(`Using model: ${model.name} / ${model.model}`);
+      console.log("Review command is still experimental. Full pipeline coming next.");
+      if (pr) console.log("Target PR:", pr);
+      if (options.model) console.log("Requested model override:", options.model);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("models")
+  .description("Show current model configuration")
+  .action(async () => {
+    if (!hasOpenRouter()) {
+      console.log("No OpenRouter API key configured.");
+      console.log("Set OPENROUTER_API_KEY in .env to use free or paid models.");
+      return;
+    }
+
+    try {
+      const model = createModelFromEnv();
+      console.log("Active provider:", model.name);
+      console.log("Active model:   ", model.model);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : err);
+    }
   });
 
 program
@@ -40,5 +79,4 @@ program
     render(React.createElement(App));
   });
 
-// Default: show help or launch TUI later
 program.parse();
