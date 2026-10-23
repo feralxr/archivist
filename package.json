@@ -1,0 +1,45 @@
+{
+  "name": "archivist",
+  "version": "0.1.0",
+  "description": "Intelligent code review agent with deep project memory",
+  "type": "module",
+  "bin": {
+    "archivist": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "dev": "tsx watch src/cli/index.ts",
+    "build": "tsc",
+    "start": "node dist/cli/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo \"lint not configured yet\""
+  },
+  "keywords": [
+    "code-review",
+    "ai",
+    "github",
+    "agent",
+    "memory",
+    "developer-tools"
+  ],
+  "author": "feralxr",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@octokit/app": "^15.1.0",
+    "@octokit/rest": "^21.0.2",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "ink": "^5.0.1",
+    "openai": "^4.67.3",
+    "react": "^18.3.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "@types/react": "^18.3.11",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  }
+}
