@@ -9,8 +9,17 @@ git clone https://github.com/feralxr/archivist.git
 cd archivist
 npm install
 cp .env.example .env
-# Add: OPENROUTER_API_KEY=sk-or-...
+```
 
+Add **any** provider key:
+
+```env
+OPENAI_API_KEY=...
+# or ANTHROPIC_API_KEY=...
+# or OPENROUTER_API_KEY=...
+```
+
+```bash
 npm test
 ```
 
@@ -24,19 +33,19 @@ That runs **everything**:
 | identity | Git remote identity, git diff |
 | review | Prompts, truncation, cosine |
 | models | Provider factory |
-| live | Real OpenRouter calls + full ReviewEngine on `fixtures/sample.diff` |
+| live | Real model calls + full ReviewEngine on `fixtures/sample.diff` |
 | fixtures | Sample files present and valid |
 
 ## Variants
 
 ```bash
-npm test              # core + live (if key set)
+npm test              # core + live (if any provider key is set)
 npm run test:core     # core only, no API calls
 npm run test:live     # same as npm test
 npm run typecheck     # TypeScript
 ```
 
-Without `OPENROUTER_API_KEY`, live tests are **skipped** (not failed).
+Without a model API key, live tests are **skipped** (not failed).
 
 ## Exit codes
 
@@ -51,5 +60,5 @@ Without `OPENROUTER_API_KEY`, live tests are **skipped** (not failed).
 ## Notes
 
 - Tests write memory only under a temp directory (never touches your `.archivist/`)
-- Free OpenRouter models can rate-limit; re-run if a live test fails with 429
-- Recommended model: `ARCHIVIST_MODEL=recursive/flint-v1.0:free`
+- Any provider may rate-limit; re-run if a live test fails with 429
+- Set `ARCHIVIST_PROVIDER` + `ARCHIVIST_MODEL` to control which backend is exercised

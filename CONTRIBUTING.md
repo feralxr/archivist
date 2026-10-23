@@ -16,7 +16,7 @@ Deepen these sectors — don’t dilute them:
 ```bash
 npm install
 cp .env.example .env
-# add OPENROUTER_API_KEY
+# add OPENAI_API_KEY, ANTHROPIC_API_KEY, and/or OPENROUTER_API_KEY
 npx tsx src/cli/index.ts doctor
 ```
 
@@ -25,7 +25,8 @@ npx tsx src/cli/index.ts doctor
 - Prefer fewer, better comments over noisy coverage
 - Memory must be explainable in review output
 - Never commit secrets (`.env`, PEM keys, tokens)
-- Keep the default path working on free OpenRouter models
+- Keep the model layer **provider-agnostic** (OpenAI, Anthropic, OpenRouter, and future providers)
+- Default DX should work with whatever key the contributor already has
 
 ## Pull requests
 

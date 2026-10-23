@@ -32,9 +32,14 @@ cp .env.example .env
 ```
 
 ```env
-OPENROUTER_API_KEY=sk-or-...
-ARCHIVIST_MODEL=recursive/flint-v1.0:free
+# Model — any supported provider
+OPENAI_API_KEY=sk-...
+# ANTHROPIC_API_KEY=sk-ant-...
+# OPENROUTER_API_KEY=sk-or-...
+ARCHIVIST_PROVIDER=openai
+ARCHIVIST_MODEL=gpt-4o-mini
 
+# GitHub App
 GITHUB_APP_ID=123456
 GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
 GITHUB_WEBHOOK_SECRET=your_webhook_secret
@@ -96,4 +101,5 @@ Put the public HTTPS URL into the GitHub App webhook settings:
 - Run behind HTTPS only
 - Set a strong `GITHUB_WEBHOOK_SECRET`
 - Use a process manager (systemd, Docker, Railway, Fly, Render)
-- Prefer a paid/stable model for production traffic; free models are rate-limited
+- Prefer a stable paid model from your provider for production traffic
+- Free / shared-pool models (on any host) can rate-limit under load

@@ -9,11 +9,17 @@ npm install
 cp .env.example .env
 ```
 
-Add your OpenRouter key to `.env`:
+Configure **at least one** model provider in `.env`:
 
 ```env
+# Any one of these is enough
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
 OPENROUTER_API_KEY=sk-or-...
-ARCHIVIST_MODEL=recursive/flint-v1.0:free
+
+# Optional
+ARCHIVIST_PROVIDER=openai
+ARCHIVIST_MODEL=gpt-4o-mini
 ```
 
 ```bash
@@ -33,14 +39,18 @@ Short version:
 
 1. Create a GitHub App with PR read/write + webhook
 2. Set `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`
-3. `npm run dev:server` (+ tunnel for local)
-4. Install the app on a repository
-5. Open a PR → Archivist reviews it
+3. Set a model provider key (OpenAI, Anthropic, or OpenRouter)
+4. `npm run dev:server` (+ tunnel for local)
+5. Install the app on a repository
+6. Open a PR → Archivist reviews it
 
 ## Requirements
 
 - Node.js 20+
-- OpenRouter API key ([openrouter.ai](https://openrouter.ai) — free models available)
+- A model API key from **any** supported provider:
+  - [OpenAI](https://platform.openai.com/)
+  - [Anthropic](https://console.anthropic.com/)
+  - [OpenRouter](https://openrouter.ai/) (optional; useful if you want multi-model routing or free-tier models)
 - For the App path: ability to receive GitHub webhooks (public URL or tunnel)
 
 ## Verify install

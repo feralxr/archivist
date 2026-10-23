@@ -7,7 +7,19 @@ Industry-level local workflow for project memory and diff review.
 ```bash
 npm install
 cp .env.example .env
-# Set OPENROUTER_API_KEY
+```
+
+Set **any** provider key (one is enough):
+
+```env
+OPENAI_API_KEY=...
+# or
+ANTHROPIC_API_KEY=...
+# or
+OPENROUTER_API_KEY=...
+
+ARCHIVIST_PROVIDER=openai          # optional
+ARCHIVIST_MODEL=gpt-4o-mini        # match your provider
 ```
 
 ## Core commands
@@ -24,6 +36,8 @@ archivist memory:add -t preferred -c "Zod for external input"
 archivist memory:add -t discouraged -c "Don't use any"
 
 archivist memory:consolidate   # merge duplicate feedback
+archivist memory:learn         # promote + infer rules from evidence
+archivist memory:quality       # 0–100 score + tips
 archivist memory:export -o mem.json
 archivist memory:import -f mem.json
 
@@ -33,6 +47,7 @@ archivist review --unstaged
 archivist review --main        # against main/master
 archivist review --file changes.diff
 
+archivist models               # show active provider + model
 archivist tui                  # interactive memory inspector
 ```
 
@@ -48,4 +63,5 @@ archivist init
 archivist memory:add -t style -c "Use named exports"
 # ... make changes ...
 archivist review
+archivist memory:learn
 ```

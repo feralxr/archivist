@@ -11,22 +11,47 @@ High signal. Low noise. Gets better as your team reviews code.
 ```bash
 git clone https://github.com/feralxr/archivist.git
 cd archivist && npm install
-cp .env.example .env   # add OPENROUTER_API_KEY
+cp .env.example .env
 ```
 
-**Local review (now):**
+Add **any** model provider key to `.env` (at least one):
+
+```env
+# Pick one (or more)
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+OPENROUTER_API_KEY=sk-or-...
+
+# Optional: force provider + model
+ARCHIVIST_PROVIDER=openai          # openrouter | anthropic | openai
+ARCHIVIST_MODEL=gpt-4o-mini
+```
+
+**Local review:**
 
 ```bash
 npx tsx src/cli/index.ts init
 npx tsx src/cli/index.ts memory:add -t style -c "Prefer early returns"
 npx tsx src/cli/index.ts review          # current git diff
-npx tsx src/cli/index.ts memory:learn    # improve memory from evidence
+npx tsx src/cli/index.ts memory:learn
 npx tsx src/cli/index.ts memory:quality
 ```
 
 **Automatic PR reviews:** [docs/GITHUB_APP.md](docs/GITHUB_APP.md)
 
-Full install paths: [docs/INSTALL.md](docs/INSTALL.md)
+Full install: [docs/INSTALL.md](docs/INSTALL.md)
+
+## Model providers
+
+Archivist is **provider-agnostic**. Use whatever keys you already have:
+
+| Provider | Env var | Example `ARCHIVIST_MODEL` |
+|----------|---------|---------------------------|
+| OpenAI | `OPENAI_API_KEY` | `gpt-4o`, `gpt-4o-mini` |
+| Anthropic | `ANTHROPIC_API_KEY` | `claude-sonnet-4-20250514` |
+| OpenRouter | `OPENROUTER_API_KEY` | any model id on OpenRouter (including free tiers) |
+
+If several keys are set, selection order is: `ARCHIVIST_PROVIDER` (if set) → OpenRouter → Anthropic → OpenAI.
 
 ## Why teams use it
 
@@ -46,7 +71,7 @@ Details: [docs/LEARNING.md](docs/LEARNING.md)
 ## Test
 
 ```bash
-npm test          # exhaustive suite (live tests if OPENROUTER_API_KEY set)
+npm test          # full suite (live tests if any provider key is set)
 npm run test:core # no API calls
 ```
 
@@ -60,6 +85,7 @@ See [docs/TESTING.md](docs/TESTING.md).
 | [CLI.md](docs/CLI.md) | Local workflow |
 | [GITHUB_APP.md](docs/GITHUB_APP.md) | Production app setup |
 | [LEARNING.md](docs/LEARNING.md) | Learning loop |
+| [TESTING.md](docs/TESTING.md) | Test suite |
 
 ## Architecture
 
@@ -68,7 +94,7 @@ src/
 ├── review/     Review engine + prompts (signal-first)
 ├── github/     GitHub App, ingest, learn from humans
 ├── memory/     Project memory, embeddings, learning pass
-├── models/     OpenRouter (pluggable)
+├── models/     OpenAI · Anthropic · OpenRouter (pluggable)
 ├── cli/        Local workflow
 └── server.ts   Webhooks
 ```
