@@ -4,9 +4,10 @@ import type { Octokit } from "@octokit/rest";
 import { env, getPrivateKey, requireGitHubApp } from "../core/config.js";
 import { handlePullRequestEvent } from "./handlers.js";
 import { handleReviewSubmitted } from "./learn.js";
+import { log } from "../core/logger.js";
 
 /**
- * Archivist GitHub App
+ * Archivist GitHub App — production entry for automatic PR reviews.
  */
 export function createGitHubApp() {
   requireGitHubApp();
@@ -27,13 +28,21 @@ export function createGitHubApp() {
     await handlePullRequestEvent(event, "synchronize");
   });
 
-  // Learn from human reviews
+  // Optional: review when draft is marked ready
+  app.webhooks.on("pull_request.ready_for_review", async (event) => {
+    await handlePullRequestEvent(event as any, "opened");
+  });
+
+  // Learn from human reviews (feeds project memory)
   app.webhooks.on("pull_request_review.submitted", async (event) => {
     await handleReviewSubmitted(event);
   });
 
   app.webhooks.onError((error) => {
-    console.error("[webhook error]", error);
+    log.error("Webhook error", {
+      message: error.message,
+      name: error.name,
+    });
   });
 
   return app;

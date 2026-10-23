@@ -12,6 +12,35 @@ import { withRetry } from "../core/retry.js";
 
 type PREvent = EmitterWebhookEvent<"pull_request">;
 
+/** Simple in-memory dedupe: installation+repo+pr+headSha */
+const recentlyReviewed = new Map<string, number>();
+const DEDUPE_TTL_MS = 10 * 60 * 1000;
+
+function dedupeKey(installationId: number, repoId: number, pr: number, sha: string) {
+  return `${installationId}:${repoId}:${pr}:${sha}`;
+}
+
+function alreadyReviewed(key: string): boolean {
+  const ts = recentlyReviewed.get(key);
+  if (!ts) return false;
+  if (Date.now() - ts > DEDUPE_TTL_MS) {
+    recentlyReviewed.delete(key);
+    return false;
+  }
+  return true;
+}
+
+function markReviewed(key: string) {
+  recentlyReviewed.set(key, Date.now());
+  // opportunistic cleanup
+  if (recentlyReviewed.size > 500) {
+    const cutoff = Date.now() - DEDUPE_TTL_MS;
+    for (const [k, v] of recentlyReviewed) {
+      if (v < cutoff) recentlyReviewed.delete(k);
+    }
+  }
+}
+
 export async function handlePullRequestEvent(
   event: PREvent,
   action: "opened" | "synchronize"
@@ -31,8 +60,33 @@ export async function handlePullRequestEvent(
     return;
   }
 
+  // Skip drafts on open
   if (action === "opened" && pr.draft) {
     log.info("Skipping draft PR", { repo: repo.full_name, pr: pr.number });
+    return;
+  }
+
+  // Skip bot-authored PRs (Dependabot, renovate, etc.)
+  const authorLogin = pr.user?.login?.toLowerCase() || "";
+  const authorType = pr.user?.type;
+  if (
+    authorType === "Bot" ||
+    authorLogin.endsWith("[bot]") ||
+    authorLogin.includes("dependabot") ||
+    authorLogin.includes("renovate")
+  ) {
+    log.info("Skipping bot PR", { repo: repo.full_name, pr: pr.number, author: authorLogin });
+    return;
+  }
+
+  const headSha = pr.head.sha;
+  const key = dedupeKey(installationId, repo.id, pr.number, headSha);
+  if (alreadyReviewed(key)) {
+    log.info("Already reviewed this head SHA — skipping", {
+      repo: repo.full_name,
+      pr: pr.number,
+      sha: headSha.slice(0, 7),
+    });
     return;
   }
 
@@ -44,16 +98,20 @@ export async function handlePullRequestEvent(
     repo: repoFullName,
     pr: pr.number,
     title: pr.title,
+    sha: headSha.slice(0, 7),
   });
 
-  // Serialize heavy review work
   await reviewQueue.run(async () => {
+    // re-check dedupe inside queue
+    if (alreadyReviewed(key)) return;
+
     try {
       await memoryStore.getOrCreate(repoId, repoFullName);
 
       const app = createGitHubApp();
       const octokit = await getInstallationOctokit(app, installationId);
 
+      // Fetch diff
       const response = await withRetry(() =>
         octokit.pulls.get({
           owner: repo.owner.login,
@@ -73,18 +131,25 @@ export async function handlePullRequestEvent(
         return;
       }
 
-      if (diffText.length > 400_000) {
-        log.warn("Diff too large — posting notice", {
+      // Large PR soft limit
+      if (diffText.length > 350_000) {
+        log.warn("Diff too large", {
           repo: repoFullName,
           pr: pr.number,
           size: diffText.length,
         });
-        await octokit.issues.createComment({
-          owner: repo.owner.login,
-          repo: repo.name,
-          issue_number: pr.number,
-          body: "### Archivist\n\nThis PR is too large for a full automated review. Consider splitting it into smaller changes.",
-        });
+        await withRetry(() =>
+          octokit.issues.createComment({
+            owner: repo.owner.login,
+            repo: repo.name,
+            issue_number: pr.number,
+            body:
+              "### Archivist\n\nThis PR is too large for a full automated review " +
+              `(~${Math.round(diffText.length / 1000)}k characters of diff). ` +
+              "Consider splitting it into smaller changes.",
+          })
+        );
+        markReviewed(key);
         return;
       }
 
@@ -118,9 +183,11 @@ export async function handlePullRequestEvent(
         owner: repo.owner.login,
         repo: repo.name,
         pullNumber: pr.number,
-        commitId: pr.head.sha,
+        commitId: headSha,
         result,
       });
+
+      markReviewed(key);
     } catch (err) {
       log.error("Handler failed", {
         repo: repoFullName,

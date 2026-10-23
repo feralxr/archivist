@@ -3,6 +3,7 @@ import type { ReviewModel } from "../models/provider.js";
 import type { ReviewComment, ReviewResult } from "../core/types.js";
 import { memoryStore } from "../memory/store.js";
 import { REVIEW_SYSTEM_PROMPT, buildUserPrompt } from "./prompts.js";
+import { log } from "../core/logger.js";
 
 const commentSchema = z.object({
   path: z.string(),
@@ -27,6 +28,12 @@ const reviewResponseSchema = z.object({
   comments: z.array(commentSchema),
 });
 
+/** Max inline comments we will ever post — hard noise ceiling */
+const MAX_COMMENTS = 8;
+
+/** Drop comments whose body is too vague / short */
+const MIN_BODY_LENGTH = 24;
+
 export class ReviewEngine {
   constructor(private model: ReviewModel) {}
 
@@ -38,9 +45,17 @@ export class ReviewEngine {
   }): Promise<ReviewResult> {
     const { repoId, diff, title, body } = params;
 
+    if (!diff || diff.trim().length < 10) {
+      return {
+        summary: "Empty or trivial diff — nothing to review.",
+        comments: [],
+        modelUsed: `${this.model.name}/${this.model.model}`,
+      };
+    }
+
     const memoryContext = await memoryStore.buildContext(
       repoId,
-      diff.slice(0, 3000)
+      diff.slice(0, 4000)
     );
 
     const userPrompt = buildUserPrompt({
@@ -48,6 +63,12 @@ export class ReviewEngine {
       diff,
       title,
       body,
+    });
+
+    log.info("Running review", {
+      repoId: repoId.slice(0, 32),
+      diffChars: diff.length,
+      model: this.model.model,
     });
 
     const raw = await this.model.review({
@@ -59,8 +80,11 @@ export class ReviewEngine {
     const parsed = extractJSON(raw);
 
     if (!parsed) {
+      log.warn("Failed to parse model JSON", {
+        preview: raw.slice(0, 200),
+      });
       return {
-        summary: raw.slice(0, 600) || "Model returned no usable output",
+        summary: truncate(raw, 500) || "Model returned unparseable output.",
         comments: [],
         modelUsed: `${this.model.name}/${this.model.model}`,
       };
@@ -69,23 +93,17 @@ export class ReviewEngine {
     const validated = reviewResponseSchema.safeParse(parsed);
 
     if (!validated.success) {
-      console.warn(
-        "[review] Schema validation failed",
-        validated.error.flatten()
-      );
+      log.warn("Schema validation failed", {
+        issues: validated.error.flatten(),
+      });
       return {
-        summary: "Model returned unstructured output",
+        summary: "Model returned unstructured output.",
         comments: [],
         modelUsed: `${this.model.name}/${this.model.model}`,
       };
     }
 
-    const comments: ReviewComment[] = validated.data.comments
-      .filter((c) => c.body.trim().length > 0)
-      .map((c) => ({
-        ...c,
-        body: c.body.trim(),
-      }));
+    const comments = postProcessComments(validated.data.comments);
 
     return {
       summary: validated.data.summary.trim(),
@@ -95,10 +113,53 @@ export class ReviewEngine {
   }
 }
 
+/**
+ * Industry-level filtering: kill noise before it reaches the PR.
+ */
+function postProcessComments(
+  comments: z.infer<typeof commentSchema>[]
+): ReviewComment[] {
+  const severityRank = { error: 0, warning: 1, suggestion: 2, info: 3 };
+
+  const cleaned = comments
+    .filter((c) => c.path && c.path.length > 0)
+    .filter((c) => c.body && c.body.trim().length >= MIN_BODY_LENGTH)
+    // Drop pure praise disguised as comments
+    .filter((c) => {
+      const b = c.body.toLowerCase();
+      if (b.includes("looks good") && b.length < 60) return false;
+      if (b.includes("lgtm")) return false;
+      return true;
+    })
+    .map((c) => ({
+      ...c,
+      body: c.body.trim(),
+      explanation: c.explanation?.trim() || undefined,
+    }));
+
+  // Prefer higher severity, then keep stable order
+  cleaned.sort(
+    (a, b) => severityRank[a.severity] - severityRank[b.severity]
+  );
+
+  // Deduplicate near-identical bodies on same path
+  const seen = new Set<string>();
+  const deduped: ReviewComment[] = [];
+  for (const c of cleaned) {
+    const key = `${c.path}:${c.body.slice(0, 80).toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(c);
+  }
+
+  return deduped.slice(0, MAX_COMMENTS);
+}
+
 function extractJSON(text: string): unknown {
   try {
     return JSON.parse(text);
   } catch {
+    // fenced
     const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (fenced) {
       try {
@@ -107,7 +168,7 @@ function extractJSON(text: string): unknown {
         // fall through
       }
     }
-
+    // largest object
     const match = text.match(/\{[\s\S]*\}/);
     if (match) {
       try {
@@ -118,4 +179,9 @@ function extractJSON(text: string): unknown {
     }
     return null;
   }
+}
+
+function truncate(s: string, n: number) {
+  const t = s.trim();
+  return t.length <= n ? t : t.slice(0, n) + "…";
 }

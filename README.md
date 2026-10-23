@@ -1,80 +1,73 @@
 # Archivist
 
-**Intelligent code review agent with deep project memory.**
+**Memory-aware code review for GitHub.**
 
-Archivist learns your codebase's style, architecture decisions, and historical review patterns — then reviews pull requests with the context of a senior engineer who's been on the team for years.
+Archivist reviews pull requests with knowledge of *your* codebase — style, architecture, and what human reviewers have actually asked for before. High signal. Low noise.
 
-Built for large codebases and the shift to agentic coding.
+## Product focus
 
-## Features
+Industry-level depth on two things:
 
-- **Project Memory** — style, architecture, preferred/discouraged patterns, recurring human feedback
-- **Hybrid retrieval** — vector embeddings when available + strong lexical fallback
-- **Learns from humans** — ingests review comments and improves over time
-- **Historical bootstrap** — analyze past merged PRs to seed memory
-- **Fully model-agnostic** — OpenRouter first (free models supported)
-- **GitHub App** — automatic reviews on PR open / update
-- **Production hardening** — retries, concurrency queue, structured logging, graceful shutdown
-- **CLI + rich TUI** — setup, doctor, status, memory inspection
+1. **Review quality** — staff-engineer signal, not linter spam  
+2. **GitHub App** — install once, automatic reviews on every PR  
 
-## Quick Start
+Everything else (CLI, TUI, local memory tools) supports that product.
+
+## Why it is different
+
+Most AI review bots treat every PR in isolation.  
+Archivist maintains **project memory**:
+
+- Style rules the team actually follows  
+- Architecture constraints  
+- Preferred vs discouraged patterns  
+- Recurring human review feedback  
+
+Comments that come from memory include a short **why** so the feedback is explainable.
+
+## Quick start (GitHub App)
+
+See **[docs/GITHUB_APP.md](docs/GITHUB_APP.md)** for the full install path.
 
 ```bash
 npm install
 cp .env.example .env
-# Add OPENROUTER_API_KEY (free key at https://openrouter.ai)
+# Set OPENROUTER_API_KEY + GitHub App credentials
 
-npx tsx src/cli/index.ts setup     # full setup guide
-npx tsx src/cli/index.ts doctor    # health check
-npx tsx src/cli/index.ts init
-npx tsx src/cli/index.ts memory:add -t style -c "Prefer early returns"
-npx tsx src/cli/index.ts review --file changes.diff
-npx tsx src/cli/index.ts tui       # interactive memory inspector
+npm run dev:server
+# Expose with cloudflared/ngrok and install the app on a repo
 ```
 
-## GitHub App
+## CLI (supporting tools)
 
 ```bash
 npx tsx src/cli/index.ts setup
-npm run dev:server
+npx tsx src/cli/index.ts doctor
+npx tsx src/cli/index.ts init
+npx tsx src/cli/index.ts memory:add -t style -c "Prefer early returns"
+npx tsx src/cli/index.ts review --file changes.diff
 ```
 
-Permissions: Pull requests (R/W), Contents (R), Metadata (R)  
-Events: `pull_request`, `pull_request_review`
+## Review quality standards
 
-## CLI Commands
-
-| Command | Description |
-|---------|-------------|
-| `setup` | Setup guide for OpenRouter + GitHub App |
-| `doctor` | Configuration health check |
-| `status` | Config + memory summary |
-| `init` | Create local project memory |
-| `memory` | Inspect memory |
-| `memory:add` | Add style / architecture / patterns |
-| `review` | Review a diff file |
-| `models` | Show active model |
-| `tui` | Interactive memory TUI |
+- Prefer **0–5** strong comments over noisy walls of text  
+- Empty comment list is a valid outcome for clean PRs  
+- Severity discipline: error / warning / suggestion / info  
+- Memory-backed comments carry an explanation  
+- Bot PRs skipped · draft PRs skipped · huge diffs get a notice · same commit not reviewed twice  
 
 ## Architecture
 
 ```
 src/
-├── cli/           CLI + rich TUI
-├── core/          Config, logger, retry, queue
-├── memory/        Project memory + embeddings + hybrid search
-├── models/        OpenRouter provider (pluggable)
-├── review/        Review engine + prompts
-├── github/        GitHub App, handlers, ingest, learn, comments
-└── server.ts      Webhook server (health, ready, graceful shutdown)
+├── review/     # Industry-level prompts + engine + post-processing
+├── github/     # GitHub App, handlers, comments, ingest, learn
+├── memory/     # Project memory (supports the review)
+├── models/     # OpenRouter (pluggable)
+├── core/       # Config, retry, queue, logging
+├── cli/        # Setup, doctor, local review helpers
+└── server.ts   # Webhook server
 ```
-
-## Status
-
-- [x] P0 — GitHub App installable, end-to-end review path
-- [x] P1 — Hybrid memory, historical bootstrap, learn from humans
-- [x] P2 — Retries, concurrency queue, logging, doctor/status, hardening
-- [x] P3 — Richer multi-tab TUI
 
 ## License
 
