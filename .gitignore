@@ -16,6 +16,9 @@ build/
 *.pem
 *.key
 
+# Archivist local data
+.archivist/
+
 # IDE
 .idea/
 .vscode/
@@ -37,7 +40,6 @@ coverage/
 # Local data
 .data/
 .cache/
-memory/
 
 # OS
 Thumbs.db

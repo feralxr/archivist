@@ -2,9 +2,12 @@
 import { Command } from "commander";
 import { render } from "ink";
 import React from "react";
+import { readFileSync, existsSync } from "node:fs";
 import { App } from "./ui/App.js";
 import { createModelFromEnv } from "../models/provider.js";
 import { hasOpenRouter } from "../core/config.js";
+import { memoryStore } from "../memory/store.js";
+import { ReviewEngine } from "../review/engine.js";
 
 const program = new Command();
 
@@ -15,41 +18,165 @@ program
 
 program
   .command("init")
-  .description("Initialize Archivist in the current repository")
-  .action(async () => {
-    console.log("Archivist init — coming soon");
+  .description("Initialize Archivist memory for this repository")
+  .option("-n, --name <name>", "Repository name")
+  .action(async (opts) => {
+    const repoId = process.cwd();
+    const repoName = opts.name || repoId.split(/[\\/]/).pop() || "unknown";
+
+    const existing = await memoryStore.get(repoId);
+    if (existing) {
+      console.log(`Memory already exists for: ${existing.repoName}`);
+      console.log(`Version: ${existing.metadata.version} | PRs analyzed: ${existing.metadata.prsAnalyzed}`);
+      return;
+    }
+
+    const memory = await memoryStore.create(repoId, repoName);
+    console.log(`✓ Created project memory for: ${memory.repoName}`);
+    console.log(`  Location: .archivist/`);
   });
 
 program
   .command("memory")
-  .description("Inspect or manage project memory")
-  .action(async () => {
-    console.log("Archivist memory — coming soon");
+  .description("Inspect project memory")
+  .option("--json", "Output raw JSON")
+  .action(async (opts) => {
+    const repoId = process.cwd();
+    const memory = await memoryStore.get(repoId);
+
+    if (!memory) {
+      console.log("No memory found. Run `archivist init` first.");
+      return;
+    }
+
+    if (opts.json) {
+      console.log(JSON.stringify(memory, null, 2));
+      return;
+    }
+
+    console.log(`\nRepository : ${memory.repoName}`);
+    console.log(`Updated    : ${memory.metadata.updatedAt}`);
+    console.log(`Version    : ${memory.metadata.version}`);
+    console.log(`PRs seen   : ${memory.metadata.prsAnalyzed}`);
+    console.log("");
+    console.log(`Style rules        : ${memory.styleRules.length}`);
+    console.log(`Architecture notes : ${memory.architectureNotes.length}`);
+    console.log(`Patterns           : ${memory.patterns.length}`);
+    console.log(`Historical feedback: ${memory.historicalFeedback.length}`);
+    console.log(`Raw snippets       : ${memory.rawReviewSnippets.length}`);
+
+    if (memory.styleRules.length) {
+      console.log("\n--- Style Rules ---");
+      memory.styleRules.slice(0, 8).forEach((r) => console.log(`• ${r.rule}`));
+    }
+    if (memory.architectureNotes.length) {
+      console.log("\n--- Architecture ---");
+      memory.architectureNotes.slice(0, 6).forEach((n) => console.log(`• ${n.note}`));
+    }
+  });
+
+program
+  .command("memory:add")
+  .description("Manually add knowledge to project memory")
+  .requiredOption("-t, --type <type>", "style | architecture | preferred | discouraged")
+  .requiredOption("-c, --content <content>", "The rule or note")
+  .action(async (opts) => {
+    const repoId = process.cwd();
+    const memory = await memoryStore.getOrCreate(repoId, repoId.split(/[\\/]/).pop() || "repo");
+
+    const content = opts.content;
+
+    switch (opts.type) {
+      case "style":
+        await memoryStore.addStyleRule(repoId, {
+          rule: content,
+          source: "manual",
+          confidence: 1,
+        });
+        break;
+      case "architecture":
+        await memoryStore.addArchitectureNote(repoId, { note: content });
+        break;
+      case "preferred":
+        await memoryStore.addPattern(repoId, {
+          description: content,
+          preferred: true,
+        });
+        break;
+      case "discouraged":
+        await memoryStore.addPattern(repoId, {
+          description: content,
+          preferred: false,
+        });
+        break;
+      default:
+        console.error("Type must be: style | architecture | preferred | discouraged");
+        process.exit(1);
+    }
+
+    console.log(`✓ Added ${opts.type} to memory`);
   });
 
 program
   .command("review")
-  .description("Manually trigger a review (experimental)")
-  .argument("[pr]", "PR number or URL")
-  .option("-m, --model <model>", "Override model")
-  .action(async (pr, options) => {
+  .description("Review a diff using project memory")
+  .option("-f, --file <path>", "Path to a diff file")
+  .option("-d, --diff <diff>", "Raw diff string")
+  .option("--title <title>", "PR title")
+  .action(async (opts) => {
     if (!hasOpenRouter()) {
       console.error(
-        "No OPENROUTER_API_KEY found.\n" +
-          "Get a free key at https://openrouter.ai and add it to your .env"
+        "No OPENROUTER_API_KEY found.\nGet a free key at https://openrouter.ai"
       );
       process.exit(1);
     }
 
-    try {
-      const model = createModelFromEnv();
-      console.log(`Using model: ${model.name} / ${model.model}`);
-      console.log("Review command is still experimental. Full pipeline coming next.");
-      if (pr) console.log("Target PR:", pr);
-      if (options.model) console.log("Requested model override:", options.model);
-    } catch (err) {
-      console.error(err instanceof Error ? err.message : err);
+    let diff = opts.diff;
+
+    if (opts.file) {
+      if (!existsSync(opts.file)) {
+        console.error(`File not found: ${opts.file}`);
+        process.exit(1);
+      }
+      diff = readFileSync(opts.file, "utf-8");
+    }
+
+    if (!diff) {
+      // Try reading from stdin in the future; for now require explicit input
+      console.error("Provide a diff with --file or --diff");
       process.exit(1);
+    }
+
+    const repoId = process.cwd();
+    await memoryStore.getOrCreate(repoId, repoId.split(/[\\/]/).pop() || "repo");
+
+    const model = createModelFromEnv();
+    const engine = new ReviewEngine(model);
+
+    console.log(`\nModel : ${model.name} / ${model.model}`);
+    console.log("Reviewing...\n");
+
+    const result = await engine.review({
+      repoId,
+      diff,
+      title: opts.title,
+    });
+
+    console.log("=== Summary ===");
+    console.log(result.summary);
+    console.log("");
+
+    if (result.comments.length === 0) {
+      console.log("No issues found.");
+    } else {
+      console.log(`=== Comments (${result.comments.length}) ===\n`);
+      for (const c of result.comments) {
+        const loc = c.line ? `${c.path}:${c.line}` : c.path;
+        console.log(`[${c.severity.toUpperCase()}] ${loc} (${c.category})`);
+        console.log(`  ${c.body}`);
+        if (c.explanation) console.log(`  → ${c.explanation}`);
+        console.log("");
+      }
     }
   });
 
@@ -59,17 +186,12 @@ program
   .action(async () => {
     if (!hasOpenRouter()) {
       console.log("No OpenRouter API key configured.");
-      console.log("Set OPENROUTER_API_KEY in .env to use free or paid models.");
+      console.log("Set OPENROUTER_API_KEY in .env");
       return;
     }
-
-    try {
-      const model = createModelFromEnv();
-      console.log("Active provider:", model.name);
-      console.log("Active model:   ", model.model);
-    } catch (err) {
-      console.error(err instanceof Error ? err.message : err);
-    }
+    const model = createModelFromEnv();
+    console.log(`Provider : ${model.name}`);
+    console.log(`Model    : ${model.model}`);
   });
 
 program
