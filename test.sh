@@ -8,8 +8,7 @@ if [[ ! -f .env ]]; then
   echo "→ Creating .env from .env.example"
   cp .env.example .env
   echo ""
-  echo "Add your OpenRouter key to .env:"
-  echo "  OPENROUTER_API_KEY=sk-or-..."
+  echo "Add a model API key to .env (OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY)."
   echo "Then re-run: ./test.sh"
   echo ""
   echo "Running core tests only (no API key)..."

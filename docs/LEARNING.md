@@ -1,8 +1,8 @@
 # Learning loop
 
-Archivist gets better the more real review activity it sees.
+Archivist gets better from **real review activity**, not only from hand-written rules.
 
-## How learning works
+## Flow
 
 ```
 Human review comments
@@ -15,7 +15,7 @@ Human review comments
         ↓
   infer extra rules from concise snippets
         ↓
-  used on the next PR review
+  used on the next review
 ```
 
 ## Automatic (GitHub App)
@@ -24,26 +24,33 @@ Human review comments
 |-------|----------|
 | PR opened | Ingest existing review comments on that PR |
 | Human submits review | Snippets + feedback; promote frequent items |
-| Bootstrap (manual/API) | Last N merged PRs → memory seed |
+| App installed / repo added | Bootstrap from recent merged PRs |
 
 ## Local commands
 
 ```bash
-archivist memory:learn      # consolidate + promote + infer
-archivist memory:quality    # score 0–100 + tips
+archivist memory:bootstrap owner/repo --limit 40
+archivist memory:learn
+archivist memory:quality
 archivist memory:consolidate
+archivist memory:add -t style -c "..."
 ```
 
-## Quality score (heuristic)
+## Quality score
 
-- Style rules, architecture notes, patterns, feedback, snippets
-- Labels: empty → thin → useful → strong
-- Tips tell you what to add next
+Heuristic 0–100 from counts of rules, architecture notes, patterns, feedback, snippets.
 
-## Tips for strong memory fast
+| Label | Meaning |
+|-------|---------|
+| empty | No useful memory yet |
+| thin | A few rules; bootstrap or add more |
+| useful | Enough to steer reviews |
+| strong | Rich history + rules |
 
-1. `archivist init`
-2. Add 3–5 real style/architecture rules manually
-3. Install the GitHub App so human reviews feed memory
-4. Run `archivist memory:learn` periodically
-5. `archivist memory:quality` until you’re in “useful” or “strong”
+## Tips for strong memory quickly
+
+1. `archivist init`  
+2. Add 3–5 real style/architecture rules  
+3. `memory:bootstrap` or install the GitHub App  
+4. `memory:learn` periodically  
+5. `memory:quality` until “useful” or better  

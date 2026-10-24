@@ -1,44 +1,41 @@
-# Archivist GitHub App — Setup
+# GitHub App setup
 
 This is the product path: install once, get memory-aware reviews on every PR.
 
 ## 1. Create the GitHub App
 
 1. Open https://github.com/settings/apps/new  
-   (or **Organization settings → Developer settings → GitHub Apps** for an org)
+   (or **Organization settings → Developer settings → GitHub Apps**)
 
-2. Fill in:
-   - **Name:** Archivist (or `Archivist for <org>`)
-   - **Homepage URL:** `https://github.com/feralxr/archivist`
-   - **Webhook URL:** `https://<your-host>/api/github/webhooks`
-   - **Webhook secret:** generate a long random string and save it
+2. **Identity**
+   - Name: `Archivist` (or `Archivist for <org>`)
+   - Homepage: `https://github.com/feralxr/archivist`
+   - Webhook URL: `https://<your-host>/api/github/webhooks`
+   - Webhook secret: long random string (save it)
 
 3. **Repository permissions**
    - Pull requests: **Read & write**
    - Contents: **Read-only**
    - Metadata: **Read-only**
-   - Checks: **Read & write** (optional — enables Archivist check runs on commits)
+   - Checks: **Read & write** (optional — enables check runs)
 
 4. **Subscribe to events**
-   - Pull request
-   - Pull request review
-   - Installation
-   - Installation repositories
+   - Pull request  
+   - Pull request review  
+   - Installation  
+   - Installation repositories  
 
-5. Create the app → **Generate a private key** → download the `.pem` file  
-   Copy the **App ID** from the app page.
+5. Create the app → **Generate a private key** (download `.pem`) → copy **App ID**.
 
-## 2. Configure environment
+## 2. Environment
 
 ```bash
 cp .env.example .env
 ```
 
 ```env
-# Model — any supported provider
-OPENAI_API_KEY=sk-...
-# ANTHROPIC_API_KEY=sk-ant-...
-# OPENROUTER_API_KEY=sk-or-...
+# Model (any supported provider)
+OPENAI_API_KEY=
 ARCHIVIST_PROVIDER=openai
 ARCHIVIST_MODEL=gpt-4o-mini
 
@@ -48,67 +45,61 @@ GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE K
 GITHUB_WEBHOOK_SECRET=your_webhook_secret
 
 PORT=3000
+ARCHIVIST_BOOTSTRAP_ON_INSTALL=true
 ```
 
-For `GITHUB_PRIVATE_KEY`, either:
-- Paste the PEM with literal `\n` for newlines, or
-- Use a single-line env var with `\n` escapes
+Store secrets in the host’s secret manager when deploying. Never commit the PEM or webhook secret.
 
 ## 3. Run the server
+
+Local:
 
 ```bash
 npm install
 npm run dev:server
 ```
 
-Local webhook tunnel (pick one):
+Tunnel for webhooks:
 
 ```bash
-# cloudflared
 cloudflared tunnel --url http://localhost:3000
-
-# or ngrok
-ngrok http 3000
+# or: ngrok http 3000
 ```
 
-Put the public HTTPS URL into the GitHub App webhook settings:
-`https://<tunnel>/api/github/webhooks`
+Set the GitHub App webhook URL to `https://<tunnel>/api/github/webhooks`.
+
+Production: [DEPLOY.md](./DEPLOY.md).
 
 ## 4. Install on a repository
 
-1. GitHub App page → **Install App**
-2. Choose the account / org
-3. Select one repo (or all)
-4. Confirm
+App page → **Install App** → choose account → select repos → confirm.
+
+On install, Archivist **bootstraps memory** from recent merged PRs (unless `ARCHIVIST_BOOTSTRAP_ON_INSTALL=false`).
 
 ## 5. Verify
 
-1. Open a non-draft PR on an installed repo
-2. Archivist should post a review within about a minute
-3. Check server logs for `Review complete`
-4. `GET /health` and `GET /ready` should return ok
+1. Open a non-draft PR  
+2. Within about a minute: review comments and/or an **Archivist** check  
+3. `GET /health` and `GET /ready`  
+4. `GET /metrics` for counters  
 
-## Behavior
+## Event behavior
 
-| Event | Action |
-|-------|--------|
-| PR opened (non-draft) | Review + light ingest |
-| PR synchronize (new commits) | Re-review (deduped per head SHA) |
-| PR ready for review | Review (draft → ready) |
-| Human review submitted | Learn into project memory |
-| Bot PRs (Dependabot, etc.) | Skipped |
-| Huge diffs | Notice comment, no full review |
+| Event | Behavior |
+|-------|----------|
+| PR opened | Review + light comment ingest |
+| PR synchronize | Re-review (deduped per head SHA) |
+| ready_for_review | Review |
+| Human review submitted | Learn into memory |
+| Installation / repos added | Bootstrap memory |
+| Bot PRs | Skipped |
+| Label `archivist:skip` | Skipped |
 
-## Production notes
+## Troubleshooting
 
-- Run behind HTTPS only
-- Set a strong `GITHUB_WEBHOOK_SECRET`
-- Use a process manager (systemd, Docker, Railway, Fly, Render)
-- Prefer a stable paid model from your provider for production traffic
-- Free / shared-pool models (on any host) can rate-limit under load
-
-
-## Bootstrap on install
-
-When the app is installed on a repo, Archivist automatically scans recent merged PRs and seeds project memory.  
-See [DEPLOY.md](./DEPLOY.md).
+| Symptom | Check |
+|---------|--------|
+| No reviews | `/ready`, model key, webhook deliveries in GitHub App settings |
+| 401/403 from GitHub | App permissions, installation on that repo |
+| No check run | Grant Checks: Read & write; non-fatal if missing |
+| Empty memory | Bootstrap logs; or run `archivist memory:bootstrap owner/repo` |

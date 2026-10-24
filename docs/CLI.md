@@ -1,83 +1,214 @@
-# Archivist CLI — Local workflow
+# CLI reference
 
-Industry-level local workflow for project memory and diff review.
-
-## Install & configure
+After install (`npm link` or global install), the command is:
 
 ```bash
-npm install
-npm link              # once — then use `archivist` anywhere
-cp .env.example .env
+archivist <command> [options]
 ```
 
-Set **any** provider key (one is enough):
+Global option (all commands):
 
-```env
-OPENAI_API_KEY=...
-# or
-ANTHROPIC_API_KEY=...
-# or
-OPENROUTER_API_KEY=...
+| Flag | Description |
+|------|-------------|
+| `--cwd <path>` | Run as if the process started in this directory (multi-repo workflows) |
+| `-V, --version` | Print version |
+| `-h, --help` | Help |
 
-ARCHIVIST_PROVIDER=openai          # optional
-ARCHIVIST_MODEL=gpt-4o-mini        # match your provider
-```
+---
 
-## Core commands
+## Setup & health
+
+### `archivist setup`
+
+Prints setup instructions (model keys, GitHub App overview).
+
+### `archivist doctor`
+
+Health check: which keys are present, whether the model client constructs, GitHub App env, local memory stats.
 
 ```bash
-archivist init                 # create memory for this git repo
-archivist status               # config + memory stats
-archivist doctor               # health check
+archivist doctor
+```
 
-archivist memory               # inspect memory
-archivist memory:list          # list all stored project memories
+### `archivist status`
+
+Short config + memory summary for the current repo identity.
+
+### `archivist models`
+
+Shows the active provider and model id resolved from env.
+
+---
+
+## Project memory
+
+Memory is stored as JSON under `.archivist/` (or `ARCHIVIST_DATA_DIR`).  
+Identity defaults to `git remote get-url origin` when available.
+
+### `archivist init`
+
+```bash
+archivist init
+archivist init -n my-repo-name
+```
+
+Creates memory for the current repo if missing.
+
+### `archivist memory`
+
+Human-readable dump of style rules, architecture notes, patterns, feedback counts.
+
+```bash
+archivist memory
+archivist memory --json
+```
+
+### `archivist memory:list`
+
+Lists all memory files in the data directory (all projects).
+
+### `archivist memory:add`
+
+```bash
 archivist memory:add -t style -c "Prefer early returns"
 archivist memory:add -t architecture -c "API layer must not import UI"
-archivist memory:add -t preferred -c "Zod for external input"
-archivist memory:add -t discouraged -c "Don't use any"
+archivist memory:add -t preferred -c "Use Zod for external input"
+archivist memory:add -t discouraged -c "Avoid any in public APIs"
+```
 
-archivist memory:consolidate   # merge duplicate feedback
-archivist memory:learn         # promote + infer rules from evidence
-archivist memory:bootstrap owner/repo   # learn from merged PR comments on GitHub
+| `-t` / `--type` | Meaning |
+|-----------------|--------|
+| `style` | Style rule |
+| `architecture` | Architecture note |
+| `preferred` | Preferred pattern |
+| `discouraged` | Discouraged pattern |
+
+### `archivist memory:consolidate`
+
+Merges near-duplicate historical feedback and trims low-value snippets.
+
+### `archivist memory:learn`
+
+Full learning pass: consolidate → promote frequent feedback to rules → infer rules from snippets.
+
+### `archivist memory:quality`
+
+Scores memory 0–100 (`empty` → `thin` → `useful` → `strong`) and prints tips.
+
+### `archivist memory:export` / `memory:import`
+
+```bash
+archivist memory:export -o backup.json
+archivist memory:import -f backup.json
+```
+
+### `archivist memory:bootstrap <repo>`
+
+Learn from **merged PR review comments** on GitHub (no App required).
+
+```bash
+archivist memory:bootstrap tj/commander.js
 archivist memory:bootstrap https://github.com/tj/commander.js --limit 40
-archivist memory:quality       # 0–100 score + tips
-archivist memory:export -o mem.json
-archivist memory:import -f mem.json
+archivist memory:bootstrap owner/repo -t "$GITHUB_TOKEN"
+```
 
-archivist review               # review current git diff (staged+unstaged)
+| Option | Default | Description |
+|--------|---------|-------------|
+| `-n, --limit <n>` | `30` | Max closed PRs to scan |
+| `-t, --token <token>` | env `GITHUB_TOKEN` / `GH_TOKEN` | PAT for rate limits / private repos |
+
+Public repos work without a token (low rate limits). **Do not pass tokens on shared screen recordings.**
+
+### `archivist tui`
+
+Interactive terminal UI for browsing memory tabs.
+
+---
+
+## Review
+
+### `archivist review`
+
+Runs a memory-aware review on a diff.
+
+```bash
+# Current unstaged + staged changes
+archivist review
+
+# Sources of diff
 archivist review --staged
 archivist review --unstaged
-archivist review --main        # against main/master
-archivist review --file changes.diff
-archivist review --json                    # machine-readable output
-archivist review --fail-on error           # exit 1 if errors (CI)
-archivist review --fail-on warning
+archivist review --main
+archivist review --file path/to.diff
+archivist review --diff "raw diff string"
 
-archivist models               # show active provider + model
-archivist tui                  # interactive memory inspector
+# Context & memory
+archivist review --title "Fix login race"
+archivist review --memory-id github.com/org/repo
+
+# Automation
+archivist review --json
+archivist review --fail-on error
+archivist review --fail-on warning
+archivist review --fail-on suggestion
 ```
+
+| Flag | Description |
+|------|-------------|
+| `-f, --file <path>` | Read diff from file |
+| `-d, --diff <string>` | Inline diff |
+| `--staged` | `git diff --cached` |
+| `--unstaged` | `git diff` |
+| `--main` | Against `main`/`master` |
+| `--title <title>` | PR title context for the model |
+| `--memory-id <id>` | Force memory id (e.g. after bootstrap) |
+| `--json` | JSON on stdout |
+| `--fail-on <level>` | Exit `1` if any comment at this severity or higher |
+
+**Exit codes**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success (and no fail-on threshold hit) |
+| `1` | Findings met `--fail-on` threshold |
+| `2` | Usage / config error (e.g. bad `--fail-on`) |
+
+---
 
 ## Multi-repo: `--cwd`
 
 ```bash
-# Run Archivist as if you were inside another checkout
-archivist --cwd /path/to/commander.js init
-archivist --cwd /path/to/commander.js review --staged
-archivist --cwd /path/to/commander.js memory
+archivist --cwd /path/to/other-repo init
+archivist --cwd /path/to/other-repo review --staged
+archivist --cwd /path/to/other-repo memory
 ```
 
-## Identity
+---
 
-Memory is keyed by `git remote get-url origin` when available  
-(e.g. `github.com/org/repo`), so the same repo clones share identity intent.
+## Typical workflows
 
-## Typical loop
+### Solo developer
 
 ```bash
 archivist init
-archivist memory:add -t style -c "Use named exports"
-# ... make changes ...
+archivist memory:add -t style -c "..."
+# hack on code
 archivist review
 archivist memory:learn
 ```
+
+### Seed from GitHub history
+
+```bash
+archivist memory:bootstrap acme/widget --limit 40
+archivist review --file pr.diff --memory-id github.com/acme/widget
+```
+
+### CI gate
+
+```bash
+git diff origin/main...HEAD > /tmp/pr.diff
+archivist review --file /tmp/pr.diff --fail-on warning --json
+```
+
+See [CI_REVIEW.md](./CI_REVIEW.md).

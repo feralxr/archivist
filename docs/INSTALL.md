@@ -1,63 +1,103 @@
 # Install Archivist
 
-## Option A — Local CLI (5 minutes)
+## Requirements
+
+- **Node.js 20+**
+- A **model API key** from at least one of: OpenAI, Anthropic, OpenRouter
+- Git (for local identity + diffs)
+
+## Option A — Local CLI (recommended first)
 
 ```bash
 git clone https://github.com/feralxr/archivist.git
 cd archivist
 npm install
-npm link          # enables the `archivist` command
+npm link
 cp .env.example .env
 ```
 
-Configure **at least one** model provider in `.env`:
+### Enable the short command
+
+| Method | Command | Result |
+|--------|---------|--------|
+| Link (dev) | `npm link` (from the repo) | `archivist` on PATH |
+| Global from GitHub | `npm install -g github:feralxr/archivist` | same |
+| No link | `npm run archivist -- review` | longer form |
+
+After `npm link`:
+
+```bash
+archivist --help
+archivist doctor
+```
+
+### Configure a model
+
+Edit `.env` (never commit this file):
 
 ```env
-# Any one of these is enough
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-OPENROUTER_API_KEY=sk-or-...
+# At least one:
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+OPENROUTER_API_KEY=
 
-# Optional
+# Optional:
 ARCHIVIST_PROVIDER=openai
 ARCHIVIST_MODEL=gpt-4o-mini
 ```
 
+See [CONFIGURATION.md](./CONFIGURATION.md).
+
+### First review
+
+```bash
+cd /path/to/your/project
+archivist init
+archivist memory:add -t style -c "Prefer early returns"
+archivist review
+```
+
+If Archivist was linked from another directory, it still runs; memory is stored under the **current** project’s `.archivist/` (or `ARCHIVIST_DATA_DIR`).
+
+### Verify
+
 ```bash
 archivist doctor
-archivist init
-archivist memory:add -t style -c "Prefer early returns over nested ifs"
-archivist review    # reviews your current git diff
+npm test                 # from the archivist clone
 ```
 
-More: [CLI.md](./CLI.md)
+---
 
-## Option B — GitHub App (automatic PR reviews)
+## Option B — GitHub App (automatic reviews)
 
-Full guide: [GITHUB_APP.md](./GITHUB_APP.md)
+1. Complete Option A so you understand the product.
+2. Follow [GITHUB_APP.md](./GITHUB_APP.md) to create the app.
+3. Deploy the server: [DEPLOY.md](./DEPLOY.md).
+4. Install the app on a repository.
+5. Open a PR → Archivist comments + optional check run.
 
-Short version:
+---
 
-1. Create a GitHub App with PR read/write + webhook
-2. Set `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`
-3. Set a model provider key (OpenAI, Anthropic, or OpenRouter)
-4. `npm run dev:server` (+ tunnel for local)
-5. Install the app on a repository
-6. Open a PR → Archivist reviews it
-
-## Requirements
-
-- Node.js 20+
-- A model API key from **any** supported provider:
-  - [OpenAI](https://platform.openai.com/)
-  - [Anthropic](https://console.anthropic.com/)
-  - [OpenRouter](https://openrouter.ai/) (optional; useful if you want multi-model routing or free-tier models)
-- For the App path: ability to receive GitHub webhooks (public URL or tunnel)
-
-## Verify install
+## Option C — Docker (App server only)
 
 ```bash
-npm test
+cp .env.example .env
+# fill model + GitHub App vars
+docker compose up -d --build
+curl http://localhost:3000/health
 ```
 
-See [TESTING.md](./TESTING.md).
+Details: [DEPLOY.md](./DEPLOY.md).
+
+---
+
+## Updating
+
+```bash
+cd /path/to/archivist
+git pull
+npm install
+npm run build    # optional; bin falls back to tsx if needed
+```
+
+If you used `npm link`, you usually do **not** need to re-link after pulls.

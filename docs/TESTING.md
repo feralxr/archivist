@@ -1,75 +1,39 @@
-# Testing Archivist
+# Testing
 
-One command. Exhaustive. End-to-end.
-
-## Quick start
+## One command
 
 ```bash
-git clone https://github.com/feralxr/archivist.git
 cd archivist
 npm install
-cp .env.example .env
-```
-
-Add **any** provider key:
-
-```env
-OPENAI_API_KEY=...
-# or ANTHROPIC_API_KEY=...
-# or OPENROUTER_API_KEY=...
-```
-
-```bash
+cp .env.example .env   # optional model key for live tests
 npm test
 ```
 
-That runs **everything**:
+| Variant | Behavior |
+|---------|----------|
+| `npm test` | Core + live (if any model key set) |
+| `npm run test:core` | No API calls |
+| `npm run test:live` | Same as `npm test` |
+| `npm run typecheck` | TypeScript |
+| `npm run eval` | Golden-diff review quality (needs model key) |
 
-| Group | What it covers |
-|-------|----------------|
-| config | Env loading, flags |
-| core | Retry, concurrency queue |
-| memory | CRUD, search, context, consolidate, export/import, learning |
-| identity | Git remote identity, git diff |
-| review | Prompts, truncation, cosine |
-| models | Provider factory |
-| live | Real model calls + full ReviewEngine on `fixtures/sample.diff` |
-| fixtures | Sample files present and valid |
+Without a model key, live tests **skip** (they do not fail).
 
-## Variants
+## What `npm test` covers
 
-```bash
-npm test              # core + live (if any provider key is set)
-npm run test:core     # core only, no API calls
-npm run test:live     # same as npm test
-npm run typecheck     # TypeScript
-```
+Config, retry/queue, memory CRUD, search, consolidate, learning, identity, prompts, providers, fixtures, and optional live ReviewEngine on `fixtures/sample.diff`.
 
-Without a model API key, live tests are **skipped** (not failed).
+Tests write only under a **temp** data dir — your `.archivist/` is untouched.
 
-## Exit codes
-
-- `0` — all executable tests passed  
-- `1` — at least one failure  
-
-## Fixtures
-
-- `fixtures/sample.diff` — realistic PR-style diff  
-- `fixtures/sample-memory.json` — sample project memory  
-
-## Notes
-
-- Tests write memory only under a temp directory (never touches your `.archivist/`)
-- Any provider may rate-limit; re-run if a live test fails with 429
-- Set `ARCHIVIST_PROVIDER` + `ARCHIVIST_MODEL` to control which backend is exercised
-
-
-## Review quality eval
-
-Golden diffs under `fixtures/eval/`:
+## Eval harness
 
 ```bash
 npm run eval
 ```
 
-Requires a model API key. Writes `fixtures/eval/last-results.json`.
+Cases live in `fixtures/eval/` (`manifest.json` + diffs). Results: `fixtures/eval/last-results.json` (gitignored).
+
+## CI
+
+GitHub Actions runs `typecheck` + `test:core` on every push to `main`.  
+See `.github/workflows/ci.yml`.
