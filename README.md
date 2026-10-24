@@ -74,6 +74,7 @@ Details: [docs/LEARNING.md](docs/LEARNING.md)
 ```bash
 npm test          # full suite (live tests if any provider key is set)
 npm run test:core # no API calls
+npm run eval       # golden-diff review quality (needs model key)
 ```
 
 See [docs/TESTING.md](docs/TESTING.md).

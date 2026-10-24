@@ -1,0 +1,9 @@
+diff --git a/src/api.ts b/src/api.ts
+index 1111111..2222222 100644
+--- a/src/api.ts
++++ b/src/api.ts
+@@ -1,5 +1,5 @@
+-export function createUser(input: {UserInput): User {
++export function createUser(input: any): User {
+   return db.users.create(input);
+ }

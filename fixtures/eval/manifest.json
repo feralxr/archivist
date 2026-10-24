@@ -1,0 +1,54 @@
+{
+  "cases": [
+    {
+      "id": "bug-div-zero",
+      "diff": "bug-div-zero.diff",
+      "title": "Remove redundant zero check",
+      "memory": {
+        "styleRules": ["Prefer explicit error handling for edge cases"],
+        "discouraged": ["Silent failure on invalid input"]
+      },
+      "expect": {
+        "minComments": 1,
+        "mustHaveSeverity": ["error", "warning"],
+        "summaryNotEmpty": true
+      }
+    },
+    {
+      "id": "clean-semicolon",
+      "diff": "clean-semicolon.diff",
+      "title": "Add missing semicolon",
+      "memory": {
+        "styleRules": ["Prefer semicolons"]
+      },
+      "expect": {
+        "maxComments": 2,
+        "summaryNotEmpty": true
+      }
+    },
+    {
+      "id": "api-any",
+      "diff": "api-any.diff",
+      "title": "Simplify createUser types",
+      "memory": {
+        "styleRules": ["Avoid any in public APIs"],
+        "discouraged": ["Don't break public API without a major version"]
+      },
+      "expect": {
+        "minComments": 1,
+        "mustHaveSeverity": ["error", "warning", "suggestion"],
+        "summaryNotEmpty": true
+      }
+    },
+    {
+      "id": "docs-only",
+      "diff": "docs-only.diff",
+      "title": "Changelog",
+      "memory": {},
+      "expect": {
+        "maxComments": 2,
+        "summaryNotEmpty": true
+      }
+    }
+  ]
+}

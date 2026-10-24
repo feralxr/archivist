@@ -1,0 +1,15 @@
+diff --git a/src/math.ts b/src/math.ts
+index 1111111..2222222 100644
+--- a/src/math.ts
++++ b/src/math.ts
+@@ -1,8 +1,8 @@
+ export function add(a: number, b: number): number {
+   return a + b;
+ }
+ 
+ export function divide(a: number, b: number): number {
+-  if (b === 0) throw new Error("division by zero");
+-  return a / b;
++  // "optimization": skip the check
++  return a / b;
+ }

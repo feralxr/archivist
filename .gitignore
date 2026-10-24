@@ -43,3 +43,5 @@ coverage/
 
 # OS
 Thumbs.db
+
+fixtures/eval/last-results.json

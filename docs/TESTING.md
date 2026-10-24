@@ -62,3 +62,14 @@ Without a model API key, live tests are **skipped** (not failed).
 - Tests write memory only under a temp directory (never touches your `.archivist/`)
 - Any provider may rate-limit; re-run if a live test fails with 429
 - Set `ARCHIVIST_PROVIDER` + `ARCHIVIST_MODEL` to control which backend is exercised
+
+
+## Review quality eval
+
+Golden diffs under `fixtures/eval/`:
+
+```bash
+npm run eval
+```
+
+Requires a model API key. Writes `fixtures/eval/last-results.json`.

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+### Added
+- `npm run eval` — golden-diff review quality harness (`fixtures/eval/`)
+- `ARCHIVIST_SKIP_DOCS_ONLY` — skip model calls for documentation-only PRs
+
 ## 0.2.0
 
 ### Added
