@@ -50,7 +50,7 @@ export async function handlePullRequestEvent(
   const { payload } = event;
   const repo = payload.repository;
   const pr = payload.pull_request;
-  const installationId = payload.installation?.id;
+  const installationId = (payload as { installation?: { id: number } }).installation?.id;
 
   if (!installationId) {
     log.warn("No installation ID — skipping");

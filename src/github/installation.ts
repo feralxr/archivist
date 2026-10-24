@@ -2,7 +2,6 @@ import type { EmitterWebhookEvent } from "@octokit/webhooks";
 import { createGitHubApp, getInstallationOctokit } from "./app.js";
 import { bootstrapRepositoryMemory } from "./ingest.js";
 import { memoryStore } from "../memory/store.js";
-import { env } from "../core/config.js";
 import { log } from "../core/logger.js";
 import { reviewQueue } from "../core/queue.js";
 import { metrics } from "../core/metrics.js";

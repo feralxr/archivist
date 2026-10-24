@@ -540,8 +540,6 @@ program
   .action(async (repoArg: string, opts: { limit: string; token?: string }) => {
     workDir();
     const { owner, repo } = parseGithubRepo(repoArg);
-    const { repoId, repoName, remoteUrl } = resolveLocalRepoIdentity();
-    // Prefer explicit target identity when bootstrapping a remote repo
     const targetId = `github.com/${owner}/${repo}`;
     await memoryStore.getOrCreate(targetId, `${owner}/${repo}`, targetId);
 

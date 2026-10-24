@@ -60,7 +60,7 @@ export function createGitHubApp() {
 }
 
 export function createWebhookMiddleware(app: ReturnType<typeof createGitHubApp>) {
-  return createNodeMiddleware(app.webhooks, {
+  return createNodeMiddleware(app, {
     path: "/api/github/webhooks",
   });
 }

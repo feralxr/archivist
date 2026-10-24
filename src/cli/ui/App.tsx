@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Box, Text, useInput, useApp } from "ink";
 import { memoryStore } from "../../memory/store.js";
 import type { ProjectMemory } from "../../memory/types.js";
-import { hasOpenRouter, hasAnthropic, hasOpenAI, hasGitHubApp, env } from "../../core/config.js";
+import { hasOpenRouter, hasAnthropic, hasOpenAI, hasGitHubApp } from "../../core/config.js";
 import { resolveLocalRepoIdentity } from "../../memory/identity.js";
 
 type Tab = "overview" | "style" | "architecture" | "patterns" | "feedback";

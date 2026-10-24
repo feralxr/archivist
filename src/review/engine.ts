@@ -54,6 +54,28 @@ export class ReviewEngine {
       };
     }
 
+    const stats = analyzeDiff(diff);
+    log.info("Running review", {
+      repoId: repoId.slice(0, 32),
+      diffChars: diff.length,
+      files: stats.files,
+      codeFiles: stats.codeFiles,
+      docsOnly: stats.docsOnly,
+      model: this.model.model,
+    });
+
+    const skipDocs =
+      (process.env.ARCHIVIST_SKIP_DOCS_ONLY || "").toLowerCase() === "true" ||
+      process.env.ARCHIVIST_SKIP_DOCS_ONLY === "1";
+    if (skipDocs && stats.docsOnly) {
+      return {
+        summary:
+          "Docs-only change detected; skipped detailed review (ARCHIVIST_SKIP_DOCS_ONLY).",
+        comments: [],
+        modelUsed: `${this.model.name}/${this.model.model}`,
+      };
+    }
+
     const memoryContext = await memoryStore.buildContext(
       repoId,
       diff.slice(0, 4000)
@@ -68,16 +90,6 @@ export class ReviewEngine {
       diff,
       title: effectiveTitle,
       body,
-    });
-
-    const stats = analyzeDiff(diff);
-    log.info("Running review", {
-      repoId: repoId.slice(0, 32),
-      diffChars: diff.length,
-      files: stats.files,
-      codeFiles: stats.codeFiles,
-      docsOnly: stats.docsOnly,
-      model: this.model.model,
     });
 
     const raw = await this.model.review({
