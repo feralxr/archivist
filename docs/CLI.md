@@ -6,6 +6,7 @@ Industry-level local workflow for project memory and diff review.
 
 ```bash
 npm install
+npm link              # once — then use `archivist` anywhere
 cp .env.example .env
 ```
 

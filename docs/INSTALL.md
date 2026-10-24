@@ -6,6 +6,7 @@
 git clone https://github.com/feralxr/archivist.git
 cd archivist
 npm install
+npm link          # enables the `archivist` command
 cp .env.example .env
 ```
 
@@ -23,10 +24,10 @@ ARCHIVIST_MODEL=gpt-4o-mini
 ```
 
 ```bash
-npx tsx src/cli/index.ts doctor
-npx tsx src/cli/index.ts init
-npx tsx src/cli/index.ts memory:add -t style -c "Prefer early returns over nested ifs"
-npx tsx src/cli/index.ts review    # reviews your current git diff
+archivist doctor
+archivist init
+archivist memory:add -t style -c "Prefer early returns over nested ifs"
+archivist review    # reviews your current git diff
 ```
 
 More: [CLI.md](./CLI.md)

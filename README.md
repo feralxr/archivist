@@ -30,12 +30,12 @@ ARCHIVIST_MODEL=gpt-4o-mini
 **Local review:**
 
 ```bash
-npx tsx src/cli/index.ts init
-npx tsx src/cli/index.ts memory:add -t style -c "Prefer early returns"
-npx tsx src/cli/index.ts review          # current git diff
-npx tsx src/cli/index.ts memory:learn
-npx tsx src/cli/index.ts memory:bootstrap tj/commander.js
-npx tsx src/cli/index.ts memory:quality
+archivist init
+archivist memory:add -t style -c "Prefer early returns"
+archivist review          # current git diff
+archivist memory:learn
+archivist memory:bootstrap tj/commander.js
+archivist memory:quality
 ```
 
 **Automatic PR reviews:** [docs/GITHUB_APP.md](docs/GITHUB_APP.md)

@@ -69,11 +69,11 @@ Users can already:
 
 ```bash
 git clone https://github.com/feralxr/archivist.git
-cd archivist && npm install
-npx tsx src/cli/index.ts ...
+cd archivist && npm install && npm link
+archivist review
 ```
 
-That is enough until you publish to npm.
+After `npm link` (or `npm install -g github:feralxr/archivist`), the command is just **`archivist`**.
 
 ## Checklist before calling it 1.0
 
