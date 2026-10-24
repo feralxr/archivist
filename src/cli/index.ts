@@ -10,13 +10,24 @@ import { memoryStore } from "../memory/store.js";
 import { ReviewEngine } from "../review/engine.js";
 import { resolveLocalRepoIdentity, getGitDiff } from "../memory/identity.js";
 import { runLearningPass, memoryQualityScore } from "../memory/learn.js";
+import { bootstrapFromGitHubApi, parseGithubRepo } from "../memory/bootstrap-cli.js";
 
 const program = new Command();
 
 program
   .name("archivist")
   .description("Memory-aware code review — local CLI and GitHub App")
-  .version("0.1.0");
+  .version("0.1.0")
+  .option("--cwd <path>", "Run as if started in this directory (for multi-repo workflows)");
+
+function workDir(): string {
+  const cwd = program.opts().cwd as string | undefined;
+  if (cwd) {
+    process.chdir(cwd);
+    return process.cwd();
+  }
+  return process.cwd();
+}
 
 // ── Setup / health ──────────────────────────────────────────
 
@@ -52,6 +63,7 @@ program
   .command("doctor")
   .description("Check configuration health")
   .action(async () => {
+    workDir();
     console.log("\nArchivist Doctor\n");
     const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
 
@@ -130,6 +142,7 @@ program
   .command("status")
   .description("Config + memory summary")
   .action(async () => {
+    workDir();
     const { repoId, repoName, remoteUrl } = resolveLocalRepoIdentity();
     console.log("\nConfiguration");
     console.log(`  OpenRouter : ${hasOpenRouter() ? "yes" : "no"}`);
@@ -171,6 +184,7 @@ program
   .description("Initialize project memory for this repo")
   .option("-n, --name <name>", "Repository name override")
   .action(async (opts) => {
+    workDir();
     const { repoId, repoName, remoteUrl } = resolveLocalRepoIdentity();
     const name = opts.name || repoName;
 
@@ -194,6 +208,7 @@ program
   .description("Inspect project memory")
   .option("--json", "Raw JSON")
   .action(async (opts) => {
+    workDir();
     const { repoId } = resolveLocalRepoIdentity();
     const memory = await memoryStore.get(repoId);
 
@@ -253,6 +268,7 @@ program
   .requiredOption("-t, --type <type>", "style | architecture | preferred | discouraged")
   .requiredOption("-c, --content <content>", "The rule or note")
   .action(async (opts) => {
+    workDir();
     const { repoId, repoName, remoteUrl } = resolveLocalRepoIdentity();
     await memoryStore.getOrCreate(repoId, repoName, remoteUrl);
 
@@ -290,6 +306,7 @@ program
   .command("memory:consolidate")
   .description("Merge duplicate feedback and trim low-value snippets")
   .action(async () => {
+    workDir();
     const { repoId } = resolveLocalRepoIdentity();
     try {
       const result = await memoryStore.consolidate(repoId);
@@ -343,6 +360,7 @@ program
   .option("--main", "Review diff against main/master")
   .option("--title <title>", "PR title context")
   .action(async (opts) => {
+    const cwd = workDir();
     if (!hasAnyModelKey()) {
       console.error(
         "No model API key found.\n" +
@@ -369,7 +387,7 @@ program
           : opts.main
             ? "main"
             : "all";
-      diff = getGitDiff(process.cwd(), mode);
+      diff = getGitDiff(cwd, mode);
       if (!diff || diff.trim().length < 5) {
         console.error(
           "No diff found. Commit status is clean, or pass --file / --diff."
@@ -437,10 +455,54 @@ program
   });
 
 
+
+program
+  .command("memory:bootstrap")
+  .description("Learn from merged PR review comments on a GitHub repo")
+  .argument("<repo>", "owner/repo or GitHub URL")
+  .option("-n, --limit <n>", "Max closed PRs to scan", "30")
+  .option("-t, --token <token>", "GitHub token (or set GITHUB_TOKEN)")
+  .action(async (repoArg: string, opts: { limit: string; token?: string }) => {
+    workDir();
+    const { owner, repo } = parseGithubRepo(repoArg);
+    const { repoId, repoName, remoteUrl } = resolveLocalRepoIdentity();
+    // Prefer explicit target identity when bootstrapping a remote repo
+    const targetId = `github.com/${owner}/${repo}`;
+    await memoryStore.getOrCreate(targetId, `${owner}/${repo}`, targetId);
+
+    console.log(`Bootstrapping memory from ${owner}/${repo}...`);
+    console.log("(Public API works without a token; GITHUB_TOKEN raises rate limits.)\n");
+
+    try {
+      const result = await bootstrapFromGitHubApi({
+        owner,
+        repo,
+        repoId: targetId,
+        token: opts.token,
+        limit: parseInt(opts.limit, 10) || 30,
+      });
+      console.log(`✓ PRs processed     : ${result.processed}`);
+      console.log(`✓ Comments ingested : ${result.commentsIngested}`);
+      console.log(`✓ Rules promoted    : ${result.promoted}`);
+      console.log(`✓ Rules inferred    : ${result.inferred}`);
+      const mem = await memoryStore.get(targetId);
+      if (mem) {
+        const q = memoryQualityScore(mem);
+        console.log(`Memory quality      : ${q.score}/100 (${q.label})`);
+      }
+      console.log(`\nMemory id: ${targetId}`);
+      console.log("Review with: archivist review --file diff.patch  (run from a checkout of that repo, or see --cwd)");
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+  });
+
 program
   .command("memory:learn")
   .description("Run learning pass: consolidate, promote feedback, infer rules")
   .action(async () => {
+    workDir();
     const { repoId } = resolveLocalRepoIdentity();
     const memory = await memoryStore.get(repoId);
     if (!memory) {
@@ -464,6 +526,7 @@ program
   .command("memory:quality")
   .description("Score how strong project memory is")
   .action(async () => {
+    workDir();
     const { repoId, repoName } = resolveLocalRepoIdentity();
     const memory = await memoryStore.get(repoId);
     if (!memory) {

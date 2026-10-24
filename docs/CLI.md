@@ -37,6 +37,8 @@ archivist memory:add -t discouraged -c "Don't use any"
 
 archivist memory:consolidate   # merge duplicate feedback
 archivist memory:learn         # promote + infer rules from evidence
+archivist memory:bootstrap owner/repo   # learn from merged PR comments on GitHub
+archivist memory:bootstrap https://github.com/tj/commander.js --limit 40
 archivist memory:quality       # 0–100 score + tips
 archivist memory:export -o mem.json
 archivist memory:import -f mem.json
@@ -49,6 +51,15 @@ archivist review --file changes.diff
 
 archivist models               # show active provider + model
 archivist tui                  # interactive memory inspector
+```
+
+## Multi-repo: `--cwd`
+
+```bash
+# Run Archivist as if you were inside another checkout
+archivist --cwd /path/to/commander.js init
+archivist --cwd /path/to/commander.js review --staged
+archivist --cwd /path/to/commander.js memory
 ```
 
 ## Identity

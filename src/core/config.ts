@@ -20,6 +20,8 @@ const envSchema = z.object({
   GITHUB_WEBHOOK_SECRET: z.string().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
+  GITHUB_TOKEN: z.string().optional(),
+  GH_TOKEN: z.string().optional(),
 
   DATABASE_URL: z.string().optional(),
 

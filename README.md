@@ -34,6 +34,7 @@ npx tsx src/cli/index.ts init
 npx tsx src/cli/index.ts memory:add -t style -c "Prefer early returns"
 npx tsx src/cli/index.ts review          # current git diff
 npx tsx src/cli/index.ts memory:learn
+npx tsx src/cli/index.ts memory:bootstrap tj/commander.js
 npx tsx src/cli/index.ts memory:quality
 ```
 

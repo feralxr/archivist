@@ -1,25 +1,47 @@
 import OpenAI from "openai";
-import { env, hasOpenRouter } from "../core/config.js";
+import { env, hasOpenRouter, hasOpenAI } from "../core/config.js";
 
 /**
- * Lightweight embedding helper.
- * Uses OpenRouter when available. Falls back to null (lexical search only).
+ * Embedding helper.
+ * Uses OpenAI when OPENAI_API_KEY is set, else OpenRouter when available.
+ * Falls back to null (lexical search only).
  */
 let client: OpenAI | null = null;
+let clientMode: "openai" | "openrouter" | null = null;
 
 function getClient(): OpenAI | null {
-  if (!hasOpenRouter()) return null;
-  if (!client) {
+  if (client) return client;
+
+  if (hasOpenAI() && env.OPENAI_API_KEY) {
+    client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+    clientMode = "openai";
+    return client;
+  }
+
+  if (hasOpenRouter() && env.OPENROUTER_API_KEY) {
     client = new OpenAI({
-      apiKey: env.OPENROUTER_API_KEY!,
+      apiKey: env.OPENROUTER_API_KEY,
       baseURL: "https://openrouter.ai/api/v1",
       defaultHeaders: {
         "HTTP-Referer": "https://github.com/feralxr/archivist",
         "X-Title": "Archivist",
       },
     });
+    clientMode = "openrouter";
+    return client;
   }
-  return client;
+
+  return null;
+}
+
+function embeddingModel(): string {
+  if (clientMode === "openai") {
+    // Native OpenAI embedding ids
+    const m = env.ARCHIVIST_EMBEDDING_MODEL || "text-embedding-3-small";
+    // Strip openrouter-style prefix if user left default
+    return m.includes("/") ? m.split("/").pop()! : m;
+  }
+  return env.ARCHIVIST_EMBEDDING_MODEL || "openai/text-embedding-3-small";
 }
 
 export async function embed(text: string): Promise<number[] | null> {
@@ -28,22 +50,18 @@ export async function embed(text: string): Promise<number[] | null> {
 
   try {
     const res = await c.embeddings.create({
-      model: env.ARCHIVIST_EMBEDDING_MODEL,
+      model: embeddingModel(),
       input: text.slice(0, 8000),
     });
     return res.data[0]?.embedding ?? null;
-  } catch (err) {
-    // Embedding model may not be available on free tier — fail soft
-    console.warn("[embeddings] Failed, falling back to lexical search");
+  } catch {
+    // Fail soft — lexical search still works
     return null;
   }
 }
 
-export async function embedBatch(
-  texts: string[]
-): Promise<(number[] | null)[]> {
+export async function embedBatch(texts: string[]): Promise<(number[] | null)[]> {
   const results: (number[] | null)[] = [];
-  // Sequential for free-tier friendliness
   for (const t of texts) {
     results.push(await embed(t));
   }

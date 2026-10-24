@@ -69,6 +69,7 @@ async function main() {
     runLearningPass,
     memoryQualityScore,
   } = await import("../src/memory/learn.js");
+  const { parseGithubRepo } = await import("../src/memory/bootstrap-cli.js");
   const { createModelFromEnv, createModel } = await import("../src/models/provider.js");
   const { ReviewEngine } = await import("../src/review/engine.js");
   const { REVIEW_SYSTEM_PROMPT, buildUserPrompt } = await import("../src/review/prompts.js");
@@ -376,6 +377,25 @@ async function main() {
     const result = await engine.review({ repoId: REPO_ID, diff: "   " });
     assertEq(result.comments.length, 0);
   }, { live: true });
+
+  // ── bootstrap helpers ──
+  test("bootstrap", "parseGithubRepo shorthand", () => {
+    const r = parseGithubRepo("tj/commander.js");
+    assertEq(r.owner, "tj");
+    assertEq(r.repo, "commander.js");
+  });
+
+  test("bootstrap", "parseGithubRepo URL", () => {
+    const r = parseGithubRepo("https://github.com/feralxr/archivist.git");
+    assertEq(r.owner, "feralxr");
+    assertEq(r.repo, "archivist");
+  });
+
+  test("bootstrap", "parseGithubRepo rejects junk", () => {
+    let threw = false;
+    try { parseGithubRepo("noremote"); } catch { threw = true; }
+    assert(threw, "should throw");
+  });
 
   // ── fixtures ──
   test("fixtures", "sample.diff valid", () => {
