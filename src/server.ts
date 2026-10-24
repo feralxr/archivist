@@ -3,6 +3,7 @@ import { createGitHubApp, createWebhookMiddleware } from "./github/app.js";
 import { env, hasGitHubApp, hasAnyModelKey } from "./core/config.js";
 import { log } from "./core/logger.js";
 import { reviewQueue } from "./core/queue.js";
+import { metrics } from "./core/metrics.js";
 
 async function main() {
   console.log("╔══════════════════════════════════════╗");
@@ -45,6 +46,12 @@ async function main() {
       const ready = hasGitHubApp() && hasAnyModelKey();
       res.writeHead(ready ? 200 : 503, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ready, githubApp: hasGitHubApp(), model: hasAnyModelKey() }));
+      return;
+    }
+
+    if (url === "/metrics") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ...metrics.snapshot(), queue: reviewQueue.stats }));
       return;
     }
 

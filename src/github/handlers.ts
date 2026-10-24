@@ -9,6 +9,7 @@ import { hasAnyModelKey } from "../core/config.js";
 import { log } from "../core/logger.js";
 import { reviewQueue } from "../core/queue.js";
 import { withRetry } from "../core/retry.js";
+import { metrics } from "../core/metrics.js";
 
 type PREvent = EmitterWebhookEvent<"pull_request">;
 
@@ -117,6 +118,7 @@ export async function handlePullRequestEvent(
     // re-check dedupe inside queue
     if (alreadyReviewed(key)) return;
 
+    metrics.inc("reviewsStarted");
     try {
       await memoryStore.getOrCreate(repoId, repoFullName);
 
@@ -200,7 +202,10 @@ export async function handlePullRequestEvent(
       });
 
       markReviewed(key);
+      metrics.inc("reviewsCompleted");
+      metrics.inc("commentsPosted", result.comments.length);
     } catch (err) {
+      metrics.inc("reviewsFailed");
       log.error("Handler failed", {
         repo: repoFullName,
         pr: pr.number,

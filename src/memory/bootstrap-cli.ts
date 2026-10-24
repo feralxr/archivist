@@ -102,6 +102,8 @@ export async function bootstrapFromGitHubApi(
         commentsIngested++;
       }
       processed++;
+      // gentle rate limit for unauthenticated / secondary limits
+      await new Promise((r) => setTimeout(r, 150));
     } catch {
       // skip individual PR failures
     }

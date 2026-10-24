@@ -5,6 +5,7 @@ import { memoryStore } from "../memory/store.js";
 import { env } from "../core/config.js";
 import { log } from "../core/logger.js";
 import { reviewQueue } from "../core/queue.js";
+import { metrics } from "../core/metrics.js";
 
 type InstallationEvent = EmitterWebhookEvent<"installation">;
 type InstallationReposEvent = EmitterWebhookEvent<"installation_repositories">;
@@ -57,6 +58,7 @@ export async function handleInstallationCreated(event: InstallationEvent) {
           repoId,
           25
         );
+        metrics.inc("bootstrapsCompleted");
         log.info("Install bootstrap done", {
           repo: r.full_name,
           ...result,

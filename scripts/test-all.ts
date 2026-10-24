@@ -75,6 +75,7 @@ async function main() {
   const { REVIEW_SYSTEM_PROMPT, buildUserPrompt } = await import("../src/review/prompts.js");
   const { analyzeDiff } = await import("../src/review/diff-stats.js");
   const { cosine } = await import("../src/memory/embeddings.js");
+  const { metrics } = await import("../src/core/metrics.js");
 
   const store = new MemoryStore();
   const REPO_ID = `test-repo-${randomUUID().slice(0, 8)}`;
@@ -131,6 +132,13 @@ async function main() {
       threw = true;
     }
     assert(threw, "should throw");
+  });
+
+  test("core", "metrics snapshot shape", () => {
+    const s = metrics.snapshot();
+    assert(typeof s.reviewsStarted === "number", "reviewsStarted");
+    assert(typeof s.uptimeSeconds === "number", "uptime");
+    assert(s.startedAt, "startedAt");
   });
 
   test("core", "ConcurrencyQueue limits parallelism", async () => {

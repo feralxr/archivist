@@ -33,7 +33,8 @@ https://<your-domain>/api/github/webhooks
 
 Build from the included `Dockerfile`. Set the same env vars as above.  
 Health check path: `/health`  
-Ready check: `/ready`
+Ready check: `/ready`  
+Metrics: `/metrics`
 
 ## Local tunnel
 
