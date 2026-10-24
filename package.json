@@ -16,7 +16,11 @@
     "lint": "echo \"lint not configured yet\"",
     "test": "tsx scripts/test-all.ts",
     "test:core": "ARCHIVIST_SKIP_LIVE=1 tsx scripts/test-all.ts",
-    "test:live": "tsx scripts/test-all.ts"
+    "test:live": "tsx scripts/test-all.ts",
+    "docker:build": "docker build -t archivist .",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
   },
   "keywords": [
     "code-review",
@@ -26,7 +30,8 @@
     "pull-request",
     "codebase-memory",
     "openrouter",
-    "cli"
+    "cli",
+    "docker"
   ],
   "author": "feralxr",
   "license": "MIT",

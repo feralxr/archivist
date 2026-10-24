@@ -87,6 +87,7 @@ See [docs/TESTING.md](docs/TESTING.md).
 | [GITHUB_APP.md](docs/GITHUB_APP.md) | Production app setup |
 | [LEARNING.md](docs/LEARNING.md) | Learning loop |
 | [TESTING.md](docs/TESTING.md) | Test suite |
+| [DEPLOY.md](docs/DEPLOY.md) | Docker & production |
 
 ## Architecture
 

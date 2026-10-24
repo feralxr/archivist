@@ -21,6 +21,8 @@ This is the product path: install once, get memory-aware reviews on every PR.
 4. **Subscribe to events**
    - Pull request
    - Pull request review
+   - Installation
+   - Installation repositories
 
 5. Create the app → **Generate a private key** → download the `.pem` file  
    Copy the **App ID** from the app page.
@@ -103,3 +105,9 @@ Put the public HTTPS URL into the GitHub App webhook settings:
 - Use a process manager (systemd, Docker, Railway, Fly, Render)
 - Prefer a stable paid model from your provider for production traffic
 - Free / shared-pool models (on any host) can rate-limit under load
+
+
+## Bootstrap on install
+
+When the app is installed on a repo, Archivist automatically scans recent merged PRs and seeds project memory.  
+See [DEPLOY.md](./DEPLOY.md).

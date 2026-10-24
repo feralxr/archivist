@@ -4,6 +4,7 @@ import type { ReviewComment, ReviewResult } from "../core/types.js";
 import { memoryStore } from "../memory/store.js";
 import { REVIEW_SYSTEM_PROMPT, buildUserPrompt } from "./prompts.js";
 import { log } from "../core/logger.js";
+import { analyzeDiff } from "./diff-stats.js";
 
 const commentSchema = z.object({
   path: z.string(),
@@ -58,16 +59,24 @@ export class ReviewEngine {
       diff.slice(0, 4000)
     );
 
+    const effectiveTitle = stats.docsOnly
+      ? `${title || "PR"} [docs-only change]`
+      : title;
+
     const userPrompt = buildUserPrompt({
       memoryContext,
       diff,
-      title,
+      title: effectiveTitle,
       body,
     });
 
+    const stats = analyzeDiff(diff);
     log.info("Running review", {
       repoId: repoId.slice(0, 32),
       diffChars: diff.length,
+      files: stats.files,
+      codeFiles: stats.codeFiles,
+      docsOnly: stats.docsOnly,
       model: this.model.model,
     });
 

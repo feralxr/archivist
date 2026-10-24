@@ -73,6 +73,7 @@ async function main() {
   const { createModelFromEnv, createModel } = await import("../src/models/provider.js");
   const { ReviewEngine } = await import("../src/review/engine.js");
   const { REVIEW_SYSTEM_PROMPT, buildUserPrompt } = await import("../src/review/prompts.js");
+  const { analyzeDiff } = await import("../src/review/diff-stats.js");
   const { cosine } = await import("../src/memory/embeddings.js");
 
   const store = new MemoryStore();
@@ -291,6 +292,18 @@ async function main() {
       diff: "x".repeat(200_000),
     });
     assertIncludes(prompt, "truncated");
+  });
+
+  test("review", "analyzeDiff docs vs code", () => {
+    const stats = analyzeDiff(`diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -1 +1 @@
+-old
++new
+`);
+    assert(stats.docsOnly, "docs only");
+    assertEq(stats.docFiles, 1);
   });
 
   test("review", "cosine similarity", () => {

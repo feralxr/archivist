@@ -66,6 +66,18 @@ export async function handlePullRequestEvent(
     return;
   }
 
+  // Skip if PR has archivist:skip label
+  const labels = (pr.labels || []).map((l: any) =>
+    (typeof l === "string" ? l : l.name || "").toLowerCase()
+  );
+  if (labels.includes("archivist:skip") || labels.includes("skip-archivist")) {
+    log.info("Skipping PR with archivist:skip label", {
+      repo: repo.full_name,
+      pr: pr.number,
+    });
+    return;
+  }
+
   // Skip bot-authored PRs (Dependabot, renovate, etc.)
   const authorLogin = pr.user?.login?.toLowerCase() || "";
   const authorType = pr.user?.type;

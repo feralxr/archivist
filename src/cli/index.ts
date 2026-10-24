@@ -359,6 +359,7 @@ program
   .option("--unstaged", "Review unstaged changes only")
   .option("--main", "Review diff against main/master")
   .option("--title <title>", "PR title context")
+  .option("--memory-id <id>", "Use this memory id (e.g. github.com/org/repo)")
   .action(async (opts) => {
     const cwd = workDir();
     if (!hasAnyModelKey()) {
@@ -397,13 +398,17 @@ program
       console.log(`Using git diff (${mode}) · ${diff.length} chars`);
     }
 
-    const { repoId, repoName, remoteUrl } = resolveLocalRepoIdentity();
+    const identity = resolveLocalRepoIdentity();
+    const repoId = (opts.memoryId as string) || identity.repoId;
+    const repoName = identity.repoName;
+    const remoteUrl = identity.remoteUrl;
     await memoryStore.getOrCreate(repoId, repoName, remoteUrl);
 
     const model = createModelFromEnv();
     const engine = new ReviewEngine(model);
 
-    console.log(`Model : ${model.name} / ${model.model}`);
+    console.log(`Model  : ${model.name} / ${model.model}`);
+    console.log(`Memory : ${repoId}`);
     console.log("Reviewing...\n");
 
     const started = Date.now();

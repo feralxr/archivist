@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.archivist
+.env
+.env.*
+!.env.example
+*.md
+docs
+fixtures
+scripts
+test.sh
+coverage
+.DS_Store

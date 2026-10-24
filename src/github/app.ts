@@ -4,6 +4,10 @@ import type { Octokit } from "@octokit/rest";
 import { env, getPrivateKey, requireGitHubApp } from "../core/config.js";
 import { handlePullRequestEvent } from "./handlers.js";
 import { handleReviewSubmitted } from "./learn.js";
+import {
+  handleInstallationCreated,
+  handleInstallationReposAdded,
+} from "./installation.js";
 import { log } from "../core/logger.js";
 
 /**
@@ -28,14 +32,21 @@ export function createGitHubApp() {
     await handlePullRequestEvent(event, "synchronize");
   });
 
-  // Optional: review when draft is marked ready
   app.webhooks.on("pull_request.ready_for_review", async (event) => {
     await handlePullRequestEvent(event as any, "opened");
   });
 
-  // Learn from human reviews (feeds project memory)
   app.webhooks.on("pull_request_review.submitted", async (event) => {
     await handleReviewSubmitted(event);
+  });
+
+  // Day-1 memory: bootstrap when installed on repos
+  app.webhooks.on("installation.created", async (event) => {
+    await handleInstallationCreated(event);
+  });
+
+  app.webhooks.on("installation_repositories.added", async (event) => {
+    await handleInstallationReposAdded(event);
   });
 
   app.webhooks.onError((error) => {
