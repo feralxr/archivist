@@ -30,6 +30,7 @@ archivist status               # config + memory stats
 archivist doctor               # health check
 
 archivist memory               # inspect memory
+archivist memory:list          # list all stored project memories
 archivist memory:add -t style -c "Prefer early returns"
 archivist memory:add -t architecture -c "API layer must not import UI"
 archivist memory:add -t preferred -c "Zod for external input"

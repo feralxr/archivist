@@ -499,6 +499,38 @@ program
 
 
 
+
+program
+  .command("memory:list")
+  .description("List all project memories in the data directory")
+  .action(async () => {
+    workDir();
+    const { readdirSync, readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const dir = process.env.ARCHIVIST_DATA_DIR || join(process.cwd(), ".archivist");
+    try {
+      const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
+      if (!files.length) {
+        console.log("No memories found in", dir);
+        return;
+      }
+      console.log(`Memories in ${dir}\n`);
+      for (const f of files) {
+        try {
+          const m = JSON.parse(readFileSync(join(dir, f), "utf-8"));
+          console.log(
+            `• ${m.repoName || f}  id=${m.repoId}  v${m.metadata?.version ?? "?"}  rules=${m.styleRules?.length ?? 0}  feedback=${m.historicalFeedback?.length ?? 0}`
+          );
+        } catch {
+          console.log(`• ${f} (unreadable)`);
+        }
+      }
+      console.log("");
+    } catch {
+      console.log("No memory directory yet. Run archivist init.");
+    }
+  });
+
 program
   .command("memory:bootstrap")
   .description("Learn from merged PR review comments on a GitHub repo")
