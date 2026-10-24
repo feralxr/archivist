@@ -89,6 +89,7 @@ See [docs/TESTING.md](docs/TESTING.md).
 | [LEARNING.md](docs/LEARNING.md) | Learning loop |
 | [TESTING.md](docs/TESTING.md) | Test suite |
 | [DEPLOY.md](docs/DEPLOY.md) | Docker & production |
+| [CI_REVIEW.md](docs/CI_REVIEW.md) | CI with --fail-on |
 
 ## Architecture
 

@@ -5,6 +5,7 @@ import { createModelFromEnv } from "../models/provider.js";
 import { memoryStore } from "../memory/store.js";
 import { ingestPullRequest } from "./ingest.js";
 import { postReviewComments } from "./comments.js";
+import { publishCheckRun } from "./checks.js";
 import { hasAnyModelKey } from "../core/config.js";
 import { log } from "../core/logger.js";
 import { reviewQueue } from "../core/queue.js";
@@ -198,6 +199,13 @@ export async function handlePullRequestEvent(
         repo: repo.name,
         pullNumber: pr.number,
         commitId: headSha,
+        result,
+      });
+
+      await publishCheckRun(octokit, {
+        owner: repo.owner.login,
+        repo: repo.name,
+        headSha,
         result,
       });
 

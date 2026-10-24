@@ -17,6 +17,7 @@ This is the product path: install once, get memory-aware reviews on every PR.
    - Pull requests: **Read & write**
    - Contents: **Read-only**
    - Metadata: **Read-only**
+   - Checks: **Read & write** (optional — enables Archivist check runs on commits)
 
 4. **Subscribe to events**
    - Pull request

@@ -7,3 +7,4 @@ export {
   handleInstallationCreated,
   handleInstallationReposAdded,
 } from "./installation.js";
+export { publishCheckRun } from "./checks.js";

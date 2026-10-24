@@ -360,6 +360,8 @@ program
   .option("--main", "Review diff against main/master")
   .option("--title <title>", "PR title context")
   .option("--memory-id <id>", "Use this memory id (e.g. github.com/org/repo)")
+  .option("--json", "Print machine-readable JSON result")
+  .option("--fail-on <level>", "Exit 1 if comments at this severity or higher: error|warning|suggestion")
   .action(async (opts) => {
     const cwd = workDir();
     if (!hasAnyModelKey()) {
@@ -419,31 +421,67 @@ program
     });
     const ms = Date.now() - started;
 
-    console.log("=== Summary ===");
-    console.log(result.summary);
-    console.log("");
-
-    if (result.comments.length === 0) {
-      console.log("No issues found.");
+    if (opts.json) {
+      console.log(
+        JSON.stringify(
+          {
+            summary: result.summary,
+            comments: result.comments,
+            modelUsed: result.modelUsed,
+            durationMs: ms,
+            memoryId: repoId,
+          },
+          null,
+          2
+        )
+      );
     } else {
-      console.log(`=== Comments (${result.comments.length}) ===\n`);
-      for (const c of result.comments) {
-        const loc = c.line ? `${c.path}:${c.line}` : c.path;
-        const badge =
-          c.severity === "error"
-            ? "ERROR"
-            : c.severity === "warning"
-              ? "WARN"
-              : c.severity === "suggestion"
-                ? "SUGGEST"
-                : "INFO";
-        console.log(`[${badge}] ${loc} (${c.category})`);
-        console.log(`  ${c.body}`);
-        if (c.explanation) console.log(`  why: ${c.explanation}`);
-        console.log("");
+      console.log("=== Summary ===");
+      console.log(result.summary);
+      console.log("");
+
+      if (result.comments.length === 0) {
+        console.log("No issues found.");
+      } else {
+        console.log(`=== Comments (${result.comments.length}) ===\n`);
+        for (const c of result.comments) {
+          const loc = c.line ? `${c.path}:${c.line}` : c.path;
+          const badge =
+            c.severity === "error"
+              ? "ERROR"
+              : c.severity === "warning"
+                ? "WARN"
+                : c.severity === "suggestion"
+                  ? "SUGGEST"
+                  : "INFO";
+          console.log(`[${badge}] ${loc} (${c.category})`);
+          console.log(`  ${c.body}`);
+          if (c.explanation) console.log(`  why: ${c.explanation}`);
+          console.log("");
+        }
       }
+      console.log(`Done in ${ms}ms · ${result.modelUsed}`);
     }
-    console.log(`Done in ${ms}ms · ${result.modelUsed}`);
+
+    // CI-friendly exit codes
+    const failOn = (opts.failOn as string | undefined)?.toLowerCase();
+    if (failOn) {
+      const rank: Record<string, number> = {
+        error: 0,
+        warning: 1,
+        suggestion: 2,
+        info: 3,
+      };
+      const threshold = rank[failOn];
+      if (threshold === undefined) {
+        console.error("--fail-on must be error|warning|suggestion");
+        process.exit(2);
+      }
+      const hit = result.comments.some(
+        (c) => (rank[c.severity] ?? 99) <= threshold
+      );
+      if (hit) process.exit(1);
+    }
   });
 
 program

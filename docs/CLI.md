@@ -48,6 +48,9 @@ archivist review --staged
 archivist review --unstaged
 archivist review --main        # against main/master
 archivist review --file changes.diff
+archivist review --json                    # machine-readable output
+archivist review --fail-on error           # exit 1 if errors (CI)
+archivist review --fail-on warning
 
 archivist models               # show active provider + model
 archivist tui                  # interactive memory inspector

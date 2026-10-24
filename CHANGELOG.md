@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2
+
+### Added
+- `archivist review --json` and `--fail-on error|warning|suggestion` for CI
+- GitHub Check Runs on reviewed commits (optional Checks permission)
+- docs/CI_REVIEW.md example workflow
+
 ## 0.2.1
 
 ### Added
