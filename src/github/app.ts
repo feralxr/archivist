@@ -60,9 +60,8 @@ export function createGitHubApp() {
 }
 
 export function createWebhookMiddleware(app: ReturnType<typeof createGitHubApp>) {
-  return createNodeMiddleware(app, {
-    path: "/api/github/webhooks",
-  });
+  // @octokit/app defaults to path "/api/github/webhooks"
+  return createNodeMiddleware(app);
 }
 
 export async function getInstallationOctokit(
