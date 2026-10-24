@@ -90,6 +90,7 @@ See [docs/TESTING.md](docs/TESTING.md).
 | [TESTING.md](docs/TESTING.md) | Test suite |
 | [DEPLOY.md](docs/DEPLOY.md) | Docker & production |
 | [CI_REVIEW.md](docs/CI_REVIEW.md) | CI with --fail-on |
+| [RELEASING.md](docs/RELEASING.md) | npm / GitHub releases (not PyPI) |
 
 ## Architecture
 
