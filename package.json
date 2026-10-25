@@ -22,7 +22,7 @@
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
     "eval": "tsx scripts/eval.ts",
-    "prepare": "npm run build || echo \"(build skipped \u2014 run npm run build later)\"",
+    "prepare": "node -e \"try{require('child_process').execSync('npx tsc',{stdio:'inherit'})}catch(e){console.log('(build skipped)')}\"",
     "prepublishOnly": "npm run typecheck && npm run build",
     "archivist": "node bin/archivist.js"
   },
