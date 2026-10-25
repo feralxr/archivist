@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.8
+
+### Model selection
+- Curated catalogs per provider (`archivist models --list`)
+- `--provider` / `--model` on `review`
+- `ARCHIVIST_REVIEW_MODEL` for review-agent override
+- docs/MODELS.md — any model id works; catalog is not a limit
+
 ## 0.3.7
 
 ### Maintenance

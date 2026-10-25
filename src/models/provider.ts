@@ -3,6 +3,7 @@ import { env } from "../core/config.js";
 import { OpenRouterModel } from "./openrouter.js";
 import { OpenAIModel } from "./openai.js";
 import { AnthropicModel } from "./anthropic.js";
+import { DEFAULT_MODELS } from "./catalog.js";
 
 /**
  * Model-agnostic interface.
@@ -19,13 +20,13 @@ export interface ReviewModel {
   }): Promise<string>;
 }
 
-const DEFAULT_MODELS: Record<ModelProvider, string> = {
-  openrouter: "recursive/flint-v1.0:free",
-  openai: "gpt-4o-mini",
-  anthropic: "claude-sonnet-4-20250514",
-  google: "gemini-2.0-flash",
-  custom: "custom-model",
-};
+/** Optional per-call overrides (CLI flags, agent roles). */
+export interface ModelSelection {
+  provider?: ModelProvider | string;
+  model?: string;
+  /** Role defaults: review | embed — affects which env vars win */
+  role?: "review" | "embed";
+}
 
 /**
  * Factory — creates the correct provider based on config.
@@ -46,97 +47,97 @@ export function createModel(config: ModelConfig): ReviewModel {
   }
 }
 
+function keyFor(provider: string): string | undefined {
+  if (provider === "openrouter") {
+    return process.env.OPENROUTER_API_KEY || env.OPENROUTER_API_KEY;
+  }
+  if (provider === "anthropic") {
+    return process.env.ANTHROPIC_API_KEY || env.ANTHROPIC_API_KEY;
+  }
+  if (provider === "openai") {
+    return process.env.OPENAI_API_KEY || env.OPENAI_API_KEY;
+  }
+  return undefined;
+}
+
 /**
- * Resolve provider + model from environment.
+ * Resolve provider + model from environment and optional overrides.
  *
- * Priority:
- * 1. ARCHIVIST_PROVIDER if set (and matching key exists)
- * 2. OPENROUTER_API_KEY
- * 3. ANTHROPIC_API_KEY
- * 4. OPENAI_API_KEY
+ * Priority for provider:
+ * 1. explicit selection.provider
+ * 2. ARCHIVIST_PROVIDER
+ * 3. first available key: OpenRouter → Anthropic → OpenAI
+ *
+ * Priority for model id:
+ * 1. explicit selection.model
+ * 2. role-specific: ARCHIVIST_REVIEW_MODEL (review) / ARCHIVIST_EMBEDDING_MODEL (embed)
+ * 3. ARCHIVIST_MODEL
+ * 4. provider default from catalog
  */
-export function resolveModelConfigFromEnv(): ModelConfig {
-  const forced = (process.env.ARCHIVIST_PROVIDER || env.ARCHIVIST_PROVIDER || "")
+export function resolveModelConfigFromEnv(
+  selection: ModelSelection = {}
+): ModelConfig {
+  const forced = (
+    selection.provider ||
+    process.env.ARCHIVIST_PROVIDER ||
+    env.ARCHIVIST_PROVIDER ||
+    ""
+  )
     .toLowerCase()
     .trim() as ModelProvider | "";
 
-  const openrouterKey = process.env.OPENROUTER_API_KEY || env.OPENROUTER_API_KEY;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY || env.ANTHROPIC_API_KEY;
-  const openaiKey = process.env.OPENAI_API_KEY || env.OPENAI_API_KEY;
+  const openrouterKey = keyFor("openrouter");
+  const anthropicKey = keyFor("anthropic");
+  const openaiKey = keyFor("openai");
 
-  const modelOverride = process.env.ARCHIVIST_MODEL || env.ARCHIVIST_MODEL;
+  const roleModel =
+    selection.role === "embed"
+      ? process.env.ARCHIVIST_EMBEDDING_MODEL || env.ARCHIVIST_EMBEDDING_MODEL
+      : process.env.ARCHIVIST_REVIEW_MODEL || process.env.ARCHIVIST_MODEL || env.ARCHIVIST_MODEL;
+
+  const modelOverride = selection.model || roleModel;
+
+  const pick = (provider: ModelProvider, apiKey: string): ModelConfig => {
+    const fallback =
+      DEFAULT_MODELS[provider as keyof typeof DEFAULT_MODELS] || "gpt-4o-mini";
+    return {
+      provider,
+      model: modelOverride || fallback,
+      apiKey,
+    };
+  };
 
   if (forced) {
-    const key =
-      forced === "openrouter"
-        ? openrouterKey
-        : forced === "anthropic"
-          ? anthropicKey
-          : forced === "openai"
-            ? openaiKey
-            : undefined;
-
+    const key = keyFor(forced);
     if (!key) {
       throw new Error(
-        `ARCHIVIST_PROVIDER=${forced} but no API key found for that provider.\n` +
+        `Provider '${forced}' selected but no API key found.\n` +
           `Set ${forced === "openrouter" ? "OPENROUTER" : forced.toUpperCase()}_API_KEY in .env`
       );
     }
-
-    return {
-      provider: forced,
-      model: modelOverride || DEFAULT_MODELS[forced],
-      apiKey: key,
-    };
+    return pick(forced as ModelProvider, key);
   }
 
-  if (openrouterKey) {
-    return {
-      provider: "openrouter",
-      model: modelOverride || DEFAULT_MODELS.openrouter,
-      apiKey: openrouterKey,
-    };
-  }
-
-  if (anthropicKey) {
-    return {
-      provider: "anthropic",
-      model:
-        modelOverride && !modelOverride.includes("/")
-          ? modelOverride
-          : modelOverride?.startsWith("claude")
-            ? modelOverride
-            : DEFAULT_MODELS.anthropic,
-      apiKey: anthropicKey,
-    };
-  }
-
-  if (openaiKey) {
-    return {
-      provider: "openai",
-      model:
-        modelOverride && !modelOverride.includes("/")
-          ? modelOverride
-          : modelOverride?.startsWith("gpt")
-            ? modelOverride
-            : DEFAULT_MODELS.openai,
-      apiKey: openaiKey,
-    };
-  }
+  if (openrouterKey) return pick("openrouter", openrouterKey);
+  if (anthropicKey) return pick("anthropic", anthropicKey);
+  if (openaiKey) return pick("openai", openaiKey);
 
   throw new Error(
     "No model API key found.\n" +
       "Set one of:\n" +
-      "  OPENROUTER_API_KEY  (free models: https://openrouter.ai)\n" +
-      "  ANTHROPIC_API_KEY   (Claude)\n" +
-      "  OPENAI_API_KEY      (GPT)\n" +
-      "Optional: ARCHIVIST_PROVIDER=openrouter|anthropic|openai\n" +
-      "Optional: ARCHIVIST_MODEL=<model-id>"
+      "  OPENROUTER_API_KEY\n" +
+      "  ANTHROPIC_API_KEY\n" +
+      "  OPENAI_API_KEY\n" +
+      "Then choose a model:\n" +
+      "  ARCHIVIST_PROVIDER=openai|anthropic|openrouter\n" +
+      "  ARCHIVIST_MODEL=<any-model-id>\n" +
+      "  ARCHIVIST_REVIEW_MODEL=<id>   # review agent only\n" +
+      "Or CLI: archivist review --provider openai --model gpt-4o"
   );
 }
 
-export function createModelFromEnv(): ReviewModel {
-  return createModel(resolveModelConfigFromEnv());
+export function createModelFromEnv(selection?: ModelSelection): ReviewModel {
+  return createModel(resolveModelConfigFromEnv(selection));
 }
 
 export function hasAnyModelKey(): boolean {

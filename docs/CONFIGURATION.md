@@ -12,7 +12,8 @@ All settings are environment variables. Load order: process env, then `.env` in 
 | `ANTHROPIC_API_KEY` | one of three | Anthropic API key |
 | `OPENROUTER_API_KEY` | one of three | OpenRouter API key |
 | `ARCHIVIST_PROVIDER` | no | Force `openai` \| `anthropic` \| `openrouter` |
-| `ARCHIVIST_MODEL` | no | Model id for the chosen provider |
+| `ARCHIVIST_MODEL` | no | Default model id for the chosen provider |
+| `ARCHIVIST_REVIEW_MODEL` | no | Model id for **review agent only** (overrides `ARCHIVIST_MODEL`) |
 | `ARCHIVIST_EMBEDDING_MODEL` | no | Embedding model id (OpenAI or OpenRouter-style) |
 
 **Selection order** when `ARCHIVIST_PROVIDER` is unset:

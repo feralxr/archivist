@@ -459,6 +459,8 @@ program
   .option("--fail-on <level>", "Exit 1 if comments at this severity or higher: error|warning|suggestion")
   .option("--report <path>", "Write a markdown report to this path")
   .option("--save", "Save last review JSON under .archivist/last-review.json")
+  .option("--provider <provider>", "openai | anthropic | openrouter")
+  .option("--model <model>", "Any model id for that provider")
   .action(async (opts) => {
     const cwd = workDir();
     if (!hasAnyModelKey()) {
@@ -503,7 +505,11 @@ program
     const remoteUrl = identity.remoteUrl;
     await memoryStore.getOrCreate(repoId, repoName, remoteUrl);
 
-    const model = createModelFromEnv();
+    const model = createModelFromEnv({
+      provider: opts.provider,
+      model: opts.model,
+      role: "review",
+    });
     const engine = new ReviewEngine(model);
 
     console.log(`Model  : ${model.name} / ${model.model}`);
@@ -677,50 +683,58 @@ program
 
 program
   .command("models")
-  .description("Show active model")
-  .action(() => {
-    if (!hasAnyModelKey()) {
-      console.log("No model API key. Set OPENROUTER_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY.");
-      return;
-    }
-    const model = createModelFromEnv();
-    console.log(`Provider : ${model.name}`);
-    console.log(`Model    : ${model.model}`);
-  });
-
-
-
-
-program
-  .command("memory:list")
-  .description("List all project memories in the data directory")
-  .action(async () => {
+  .description("Show active model and curated catalogs (any model id still works)")
+  .option("--provider <provider>", "Filter catalog: openai | anthropic | openrouter")
+  .option("--list", "List curated models")
+  .action(async (opts: { provider?: string; list?: boolean }) => {
     workDir();
-    const { readdirSync, readFileSync } = await import("node:fs");
-    const { join } = await import("node:path");
-    const dir = process.env.ARCHIVIST_DATA_DIR || join(process.cwd(), ".archivist");
+    const { listCatalog, DEFAULT_MODELS } = await import("../models/catalog.js");
+    const { resolveModelConfigFromEnv, createModelFromEnv } = await import(
+      "../models/provider.js"
+    );
+
     try {
-      const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
-      if (!files.length) {
-        console.log("No memories found in", dir);
-        return;
-      }
-      console.log(`Memories in ${dir}\n`);
-      for (const f of files) {
-        try {
-          const m = JSON.parse(readFileSync(join(dir, f), "utf-8"));
-          console.log(
-            `• ${m.repoName || f}  id=${m.repoId}  v${m.metadata?.version ?? "?"}  rules=${m.styleRules?.length ?? 0}  feedback=${m.historicalFeedback?.length ?? 0}`
-          );
-        } catch {
-          console.log(`• ${f} (unreadable)`);
+      const cfg = resolveModelConfigFromEnv({ role: "review" });
+      const active = createModelFromEnv({ role: "review" });
+      console.log("\nActive review model");
+      console.log(`  Provider : ${cfg.provider}`);
+      console.log(`  Model    : ${active.model}`);
+      console.log(`  Client   : ${active.name}`);
+    } catch (err) {
+      console.log("\nActive review model: not configured");
+      console.log(`  ${(err as Error).message.split("\n")[0]}`);
+    }
+
+    if (opts.list || opts.provider) {
+      console.log("\nCurated catalog (not exhaustive — pass any provider model id):\n");
+      const rows = listCatalog(opts.provider);
+      let last = "";
+      for (const { provider, entry } of rows) {
+        if (provider !== last) {
+          console.log(`### ${provider}`);
+          last = provider;
         }
+        const tier = entry.tier ? `[${entry.tier}]` : "";
+        const notes = entry.notes ? ` — ${entry.notes}` : "";
+        console.log(`  ${entry.id.padEnd(42)} ${tier} ${entry.label}${notes}`);
       }
-      console.log("");
-    } catch {
-      console.log("No memory directory yet. Run archivist init.");
+      console.log("\nDefaults:");
+      for (const [prov, id] of Object.entries(DEFAULT_MODELS)) {
+        console.log(`  ${prov.padEnd(12)} ${id}`);
+      }
+      console.log(`
+Override examples:
+  ARCHIVIST_PROVIDER=openai ARCHIVIST_MODEL=gpt-4o
+  ARCHIVIST_REVIEW_MODEL=claude-sonnet-4-20250514
+  archivist review --provider anthropic --model claude-sonnet-4-20250514
+  archivist review --model openai/gpt-4o   # OpenRouter-style ids when using OR
+`);
+    } else {
+      console.log("\nTip: archivist models --list");
+      console.log("     archivist models --provider openrouter --list\n");
     }
   });
+
 
 program
   .command("memory:bootstrap")

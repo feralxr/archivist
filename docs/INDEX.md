@@ -5,6 +5,7 @@
 1. [INSTALL.md](./INSTALL.md) — clone, `npm link`, `.env`
 2. [CLI.md](./CLI.md) — everyday commands
 3. [CONFIGURATION.md](./CONFIGURATION.md) — environment variables
+3b. [MODELS.md](./MODELS.md) — model / provider selection
 4. [PIPELINES.md](./PIPELINES.md) — how the pieces connect
 
 ## Product paths

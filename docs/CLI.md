@@ -178,6 +178,10 @@ archivist review --fail-on warning
 archivist review --fail-on suggestion
 archivist review --report review.md
 archivist review --save
+archivist review --provider openai --model gpt-4o
+archivist review --provider anthropic --model claude-sonnet-4-20250514
+archivist models --list
+archivist models --provider openrouter --list
 archivist review:last
 ```
 

@@ -95,6 +95,7 @@ Guide: **[docs/GITHUB_APP.md](docs/GITHUB_APP.md)** · Deploy: **[docs/DEPLOY.md
 | [INSTALL.md](docs/INSTALL.md) | Install, `npm link`, env setup |
 | [CLI.md](docs/CLI.md) | Every CLI command & flag |
 | [CONFIGURATION.md](docs/CONFIGURATION.md) | All environment variables |
+| [MODELS.md](docs/MODELS.md) | Provider + model selection |
 | [PIPELINES.md](docs/PIPELINES.md) | End-to-end flows (local, App, learning) |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Code layout & design |
 | [GITHUB_APP.md](docs/GITHUB_APP.md) | Create & install the GitHub App |

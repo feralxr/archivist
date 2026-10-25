@@ -12,6 +12,8 @@ const envSchema = z.object({
   /** Force provider: openrouter | anthropic | openai */
   ARCHIVIST_PROVIDER: z.string().optional(),
   ARCHIVIST_MODEL: z.string().default("gpt-4o-mini"),
+  /** Override model for review agent only (falls back to ARCHIVIST_MODEL) */
+  ARCHIVIST_REVIEW_MODEL: z.string().optional(),
   ARCHIVIST_EMBEDDING_MODEL: z.string().default("openai/text-embedding-3-small"),
 
   // GitHub App
