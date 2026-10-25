@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.3
+
+### Deepened
+- **memory:search** — query project memory with scores
+- **explain** — map a topic/snippet to related memory + how it is used
+- **Check runs** — findings list, meta, and line annotations
+
 ## 0.3.2
 
 ### Deepened

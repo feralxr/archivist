@@ -19,7 +19,9 @@ cp .env.example .env     # add a model API key (see below)
 ```
 
 ```bash
-archivist doctor         # check config
+archivist doctor
+archivist memory:search "early return"
+archivist explain "public API"         # check config
 archivist init           # create project memory for this git repo
 archivist memory:add -t style -c "Prefer early returns over nested ifs"
 archivist review         # review current git diff

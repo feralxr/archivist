@@ -92,6 +92,22 @@ archivist memory:add -t discouraged -c "Avoid any in public APIs"
 | `preferred` | Preferred pattern |
 | `discouraged` | Discouraged pattern |
 
+### `archivist memory:search`
+
+```bash
+archivist memory:search "early return"
+archivist memory:search "public API" -n 5
+```
+
+### `archivist explain`
+
+Show how project memory relates to a topic or snippet:
+
+```bash
+archivist explain "error handling"
+archivist explain "export function createUser"
+```
+
 ### `archivist memory:consolidate`
 
 Merges near-duplicate historical feedback and trims low-value snippets.

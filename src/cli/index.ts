@@ -687,6 +687,30 @@ program
     }
   });
 
+
+program
+  .command("memory:search")
+  .description("Search project memory (lexical / embeddings when available)")
+  .argument("<query>", "Search text")
+  .option("-n, --limit <n>", "Max results", "10")
+  .action(async (query: string, opts: { limit: string }) => {
+    workDir();
+    const { repoId } = resolveLocalRepoIdentity();
+    const limit = parseInt(opts.limit, 10) || 10;
+    const results = await memoryStore.search(repoId, query, limit);
+    if (!results.length) {
+      console.log("No matches.");
+      return;
+    }
+    console.log(`\nSearch: "${query}" (${results.length} hits)\n`);
+    for (const r of results) {
+      const id = r.id ? r.id.slice(0, 8) : "--------";
+      console.log(`• [${r.type}] ${id}  score=${r.score.toFixed(3)}`);
+      console.log(`  ${r.content.slice(0, 200).replace(/\n/g, " ")}`);
+      console.log("");
+    }
+  });
+
 program
   .command("memory:learn")
   .description("Run learning pass: consolidate, promote feedback, infer rules")
@@ -737,6 +761,42 @@ program
       q.tips.forEach((tip) => console.log(`  • ${tip}`));
       console.log("");
     }
+  });
+
+
+program
+  .command("explain")
+  .description("Explain how project memory relates to a topic or code snippet")
+  .argument("<text>", "Topic, rule text, or code snippet")
+  .option("-n, --limit <n>", "Max related items", "8")
+  .action(async (text: string, opts: { limit: string }) => {
+    workDir();
+    const { repoId, repoName } = resolveLocalRepoIdentity();
+    const memory = await memoryStore.get(repoId);
+    if (!memory) {
+      console.log("No memory. Run archivist init first.");
+      process.exit(1);
+    }
+    const limit = parseInt(opts.limit, 10) || 8;
+    const results = await memoryStore.search(repoId, text, limit);
+    console.log(`\nExplain · ${repoName}`);
+    console.log(`Query: ${text.slice(0, 120)}${text.length > 120 ? "…" : ""}\n`);
+
+    if (!results.length) {
+      console.log("No related memory items. This topic is not constrained by project memory yet.");
+      console.log('Add guidance: archivist memory:add -t style -c "..."');
+      return;
+    }
+
+    console.log("Related project memory:\n");
+    for (const r of results) {
+      console.log(`• (${r.type}, score ${r.score.toFixed(2)}) ${r.content.slice(0, 240)}`);
+    }
+    console.log("\nHow Archivist uses this:");
+    console.log("  On review, these items are injected into the model context.");
+    console.log("  Higher-score and higher-confidence rules weigh more in prompting.");
+    console.log("  Comments should cite memory in their explanation when applicable.");
+    console.log("");
   });
 
 program
