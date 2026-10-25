@@ -333,6 +333,30 @@ program
     process.exit(1);
   });
 
+
+program
+  .command("memory:edit")
+  .description("Edit a style rule, architecture note, or pattern by id")
+  .argument("<id>", "Full id or unique prefix")
+  .requiredOption("-c, --content <content>", "New text content")
+  .action(async (id: string, opts: { content: string }) => {
+    workDir();
+    const { repoId } = resolveLocalRepoIdentity();
+    const content = opts.content.trim();
+    if (!content) {
+      console.error("Content cannot be empty");
+      process.exit(1);
+    }
+    const ok = await memoryStore.updateById(repoId, id, content);
+    if (!ok) {
+      console.error(
+        `No editable item matching "${id}" (style/architecture/pattern).`
+      );
+      process.exit(1);
+    }
+    console.log(`✓ Updated ${id.slice(0, 8)}`);
+  });
+
 program
   .command("memory:add")
   .description("Add knowledge to project memory")
