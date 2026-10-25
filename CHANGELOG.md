@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1
+
+### Deepened
+- **memory:rm / memory:show** — remove or inspect items by id
+- **Large-diff chunking** — multi-file diffs split into review chunks (max 4) and merged
+- **Bootstrap filters** — skip LGTM / noise comments when seeding memory
+
 ## 0.3.0
 
 ### Deepened features

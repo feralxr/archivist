@@ -81,7 +81,7 @@ export async function bootstrapFromGitHubApi(
 
       for (const comment of comments) {
         if (comment.user?.type === "Bot") continue;
-        if (!comment.body || comment.body.length < 30) continue;
+        if (!comment.body || !isUsefulReviewComment(comment.body)) continue;
 
         await memoryStore.addRawSnippet(repoId, {
           text: comment.body,
@@ -141,4 +141,13 @@ export function parseGithubRepo(input: string): { owner: string; repo: string } 
     throw new Error(`Invalid repo "${input}". Use owner/repo or a GitHub URL.`);
   }
   return { owner: parts[0], repo: parts[1] };
+}
+
+
+function isUsefulReviewComment(body: string): boolean {
+  const t = body.trim();
+  if (t.length < 30 || t.length > 2000) return false;
+  if (/^(lgtm|looks good|ship it|nit)\.?$/i.test(t)) return false;
+  if (/^[+\- ]/.test(t) && t.split("\n").length > 20) return false; // pasted diff
+  return true;
 }

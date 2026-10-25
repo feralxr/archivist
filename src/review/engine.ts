@@ -10,6 +10,7 @@ import { memoryStore } from "../memory/store.js";
 import { REVIEW_SYSTEM_PROMPT, buildUserPrompt } from "./prompts.js";
 import { log } from "../core/logger.js";
 import { analyzeDiff } from "./diff-stats.js";
+import { chunkDiff } from "./chunk.js";
 
 const commentSchema = z.object({
   path: z.string(),
@@ -106,6 +107,24 @@ export class ReviewEngine {
           diffStats: stats,
         },
       };
+    }
+
+    // Large multi-file diffs: review in chunks and merge
+    const chunks = chunkDiff(diff);
+    if (chunks.length > 1) {
+      log.info("Chunked large diff", {
+        chunks: chunks.length,
+        totalChars: diff.length,
+      });
+      return this.reviewChunked({
+        repoId,
+        chunks,
+        title,
+        body,
+        stats,
+        modelUsed,
+        started,
+      });
     }
 
     const memoryContext = await memoryStore.buildContext(
@@ -212,6 +231,111 @@ export class ReviewEngine {
       },
     };
   }
+
+  private async reviewChunked(params: {
+    repoId: string;
+    chunks: ReturnType<typeof chunkDiff>;
+    title?: string;
+    body?: string;
+    stats: ReturnType<typeof analyzeDiff>;
+    modelUsed: string;
+    started: number;
+  }): Promise<ReviewResult> {
+    const { repoId, chunks, title, body, stats, modelUsed, started } = params;
+    const allComments: ReviewComment[] = [];
+    const summaries: string[] = [];
+    let memoryItemsUsed = 0;
+    let memoryChars = 0;
+    let parseFallback = false;
+
+    const maxChunks = Math.min(chunks.length, 4);
+    const selected = chunks.slice(0, maxChunks);
+
+    for (const chunk of selected) {
+      const memoryContext = await memoryStore.buildContext(
+        repoId,
+        chunk.text.slice(0, 4_000)
+      );
+      memoryItemsUsed = Math.max(
+        memoryItemsUsed,
+        countMemoryBullets(memoryContext)
+      );
+      memoryChars = Math.max(memoryChars, memoryContext.length);
+
+      const userPrompt = buildUserPrompt({
+        memoryContext,
+        diff: chunk.text,
+        title: `${title || "PR"} [chunk ${chunk.index + 1}/${chunks.length}: ${chunk.paths.slice(0, 3).join(", ")}]`,
+        body,
+        diffStats: stats,
+      });
+
+      try {
+        const raw = await this.model.review({
+          diff: chunk.text,
+          memoryContext: userPrompt,
+          systemInstructions: REVIEW_SYSTEM_PROMPT,
+        });
+        const parsed = extractJSON(raw);
+        if (!parsed) {
+          parseFallback = true;
+          continue;
+        }
+        const validated = reviewResponseSchema.safeParse(parsed);
+        if (!validated.success) {
+          parseFallback = true;
+          continue;
+        }
+        if (validated.data.summary) summaries.push(validated.data.summary);
+        const paths = new Set(chunk.paths);
+        const comments = postProcessComments(
+          validated.data.comments,
+          paths,
+          memoryContext
+        );
+        allComments.push(...comments);
+      } catch (err) {
+        log.warn("Chunk review failed", {
+          chunk: chunk.index,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    const seen = new Set<string>();
+    const merged: ReviewComment[] = [];
+    for (const c of allComments.sort(
+      (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
+    )) {
+      const key = `${c.path}:${c.line ?? ""}:${c.body.slice(0, 60).toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(c);
+      if (merged.length >= MAX_COMMENTS) break;
+    }
+
+    const summary =
+      summaries.slice(0, 3).join(" ") ||
+      (merged.length
+        ? `Reviewed ${selected.length} diff chunk(s); ${merged.length} issue(s) raised.`
+        : `Reviewed ${selected.length} diff chunk(s); no material issues found.`);
+
+    return {
+      summary: summary.slice(0, 800),
+      comments: merged,
+      modelUsed,
+      meta: {
+        durationMs: Date.now() - started,
+        memoryChars,
+        memoryItemsUsed,
+        diffChars: chunks.reduce((n, c) => n + c.chars, 0),
+        diffStats: stats,
+        truncatedDiff: chunks.length > maxChunks,
+        parseFallback,
+      },
+    };
+  }
+
 }
 
 function postProcessComments(

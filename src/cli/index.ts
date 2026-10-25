@@ -262,6 +262,53 @@ program
     console.log("");
   });
 
+
+program
+  .command("memory:rm")
+  .description("Remove a memory item by id (prefix match ok)")
+  .argument("<id>", "Full id or unique prefix from `archivist memory`")
+  .action(async (id: string) => {
+    workDir();
+    const { repoId } = resolveLocalRepoIdentity();
+    const result = await memoryStore.removeById(repoId, id);
+    if (!result.removed) {
+      console.error(`No item matching id "${id}". Run: archivist memory`);
+      process.exit(1);
+    }
+    console.log(`✓ Removed ${result.type} ${id}`);
+  });
+
+program
+  .command("memory:show")
+  .description("Show one memory item by id")
+  .argument("<id>", "Full id or unique prefix")
+  .action(async (id: string) => {
+    workDir();
+    const { repoId } = resolveLocalRepoIdentity();
+    const memory = await memoryStore.get(repoId);
+    if (!memory) {
+      console.error("No memory. Run archivist init.");
+      process.exit(1);
+    }
+    const pools: Array<{ type: string; items: Array<{ id: string; [k: string]: unknown }> }> = [
+      { type: "style", items: memory.styleRules },
+      { type: "architecture", items: memory.architectureNotes },
+      { type: "pattern", items: memory.patterns },
+      { type: "feedback", items: memory.historicalFeedback },
+      { type: "snippet", items: memory.rawSnippets },
+    ];
+    for (const pool of pools) {
+      const hit = pool.items.find((x) => x.id === id || x.id.startsWith(id));
+      if (hit) {
+        console.log(`Type: ${pool.type}`);
+        console.log(JSON.stringify(hit, null, 2));
+        return;
+      }
+    }
+    console.error(`No item matching "${id}"`);
+    process.exit(1);
+  });
+
 program
   .command("memory:add")
   .description("Add knowledge to project memory")

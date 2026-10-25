@@ -74,6 +74,7 @@ async function main() {
   const { ReviewEngine } = await import("../src/review/engine.js");
   const { REVIEW_SYSTEM_PROMPT, buildUserPrompt } = await import("../src/review/prompts.js");
   const { analyzeDiff } = await import("../src/review/diff-stats.js");
+  const { chunkDiff } = await import("../src/review/chunk.js");
   const { cosine } = await import("../src/memory/embeddings.js");
   const { metrics } = await import("../src/core/metrics.js");
 
@@ -300,6 +301,25 @@ async function main() {
       diff: "x".repeat(200_000),
     });
     assertIncludes(prompt, "truncated");
+  });
+
+  test("review", "chunkDiff splits multi-file", () => {
+    const multi = `diff --git a/a.ts b/a.ts
+--- a/a.ts
++++ b/a.ts
+@@ -1 +1 @@
+-old
++new
+diff --git a/b.ts b/b.ts
+--- a/b.ts
++++ b/b.ts
+@@ -1 +1 @@
+-x
++y
+`;
+    const chunks = chunkDiff(multi, 50);
+    assert(chunks.length >= 1, "at least one chunk");
+    assert(chunks.every((c) => c.chars > 0), "nonempty");
   });
 
   test("review", "analyzeDiff docs vs code", () => {

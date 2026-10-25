@@ -253,6 +253,56 @@ export class MemoryStore {
   /**
    * Build a token-budgeted context string for the model.
    */
+
+  /** Remove a memory item by id across collections. */
+  async removeById(
+    repoId: string,
+    id: string
+  ): Promise<{ removed: boolean; type?: string }> {
+    const memory = await this.require(repoId);
+    const collections: Array<{
+      key: keyof ProjectMemory;
+      type: string;
+    }> = [
+      { key: "styleRules", type: "style" },
+      { key: "architectureNotes", type: "architecture" },
+      { key: "patterns", type: "pattern" },
+      { key: "historicalFeedback", type: "feedback" },
+      { key: "rawSnippets", type: "snippet" },
+    ];
+
+    for (const { key, type } of collections) {
+      const arr = memory[key] as Array<{ id: string }>;
+      if (!Array.isArray(arr)) continue;
+      const idx = arr.findIndex((x) => x.id === id || x.id.startsWith(id));
+      if (idx >= 0) {
+        arr.splice(idx, 1);
+        await this.save(memory);
+        return { removed: true, type };
+      }
+    }
+    return { removed: false };
+  }
+
+  /** Update a style rule body by id (prefix match ok). */
+  async updateStyleRule(
+    repoId: string,
+    id: string,
+    rule: string
+  ): Promise<boolean> {
+    const memory = await this.require(repoId);
+    const item = memory.styleRules.find(
+      (r) => r.id === id || r.id.startsWith(id)
+    );
+    if (!item) return false;
+    item.rule = rule.trim();
+    item.updatedAt = new Date().toISOString();
+    item.embedding = (await embed(item.rule)) ?? undefined;
+    await this.save(memory);
+    return true;
+  }
+
+
   async buildContext(repoId: string, diffSnippet = ""): Promise<string> {
     const memory = await this.get(repoId);
     if (!memory) return "No project memory available yet.";

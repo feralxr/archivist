@@ -1,6 +1,6 @@
 {
   "name": "archivist",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Memory-aware code review for GitHub \u2014 high-signal PR reviews that learn your codebase",
   "type": "module",
   "bin": {
