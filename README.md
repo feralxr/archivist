@@ -1,3 +1,5 @@
+[![CI](https://github.com/feralxr/archivist/actions/workflows/ci.yml/badge.svg)](https://github.com/feralxr/archivist/actions/workflows/ci.yml)
+
 # Archivist
 
 **Memory-aware code review for GitHub.**

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.7
+
+### Maintenance
+- Add `package-lock.json` and CI `npm ci` + cache
+- Issue / PR templates, Dependabot, EditorConfig, gitattributes
+- Root SECURITY.md; CI badge on README
+- Align default `ARCHIVIST_MODEL` with multi-provider docs
+
 ## 0.3.6
 
 ### Webhook reliability
