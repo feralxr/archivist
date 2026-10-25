@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.2
+
+### Deepened
+- **memory:edit** — update style/architecture/pattern by id
+- **memory** listing shows short ids + conf/source for rm/show/edit
+- **Parallel chunk reviews** (2 concurrent) for large multi-file diffs
+
 ## 0.3.1
 
 ### Deepened

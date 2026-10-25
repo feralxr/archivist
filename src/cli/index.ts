@@ -238,27 +238,51 @@ program
     console.log(`Historical feedback  ${memory.historicalFeedback.length}`);
     console.log(`Raw snippets         ${memory.rawSnippets.length}`);
 
+    const short = (id: string) => id.slice(0, 8);
+
     if (memory.styleRules.length) {
       console.log("\n--- Style ---");
-      memory.styleRules.slice(0, 12).forEach((r) => console.log(`• ${r.rule}`));
+      memory.styleRules.slice(0, 20).forEach((r) => {
+        const conf =
+          typeof r.confidence === "number"
+            ? ` conf=${r.confidence.toFixed(2)}`
+            : "";
+        const src = r.source ? ` [${r.source}]` : "";
+        console.log(`• ${short(r.id)}  ${r.rule}${src}${conf}`);
+      });
     }
     if (memory.architectureNotes.length) {
       console.log("\n--- Architecture ---");
-      memory.architectureNotes.slice(0, 8).forEach((n) => console.log(`• ${n.note}`));
+      memory.architectureNotes.slice(0, 12).forEach((n) => {
+        console.log(`• ${short(n.id)}  ${n.note}`);
+      });
     }
     if (memory.patterns.length) {
       console.log("\n--- Patterns ---");
-      memory.patterns.slice(0, 12).forEach((p) => {
-        console.log(`• [${p.preferred ? "preferred" : "discouraged"}] ${p.description}`);
+      memory.patterns.slice(0, 16).forEach((pat) => {
+        console.log(
+          `• ${short(pat.id)}  [${pat.preferred ? "preferred" : "discouraged"}] ${pat.description}`
+        );
       });
     }
     if (memory.historicalFeedback.length) {
       console.log("\n--- Recurring feedback ---");
       memory.historicalFeedback
         .sort((a, b) => b.frequency - a.frequency)
-        .slice(0, 10)
-        .forEach((f) => console.log(`• (${f.frequency}×) ${f.summary.slice(0, 120)}`));
+        .slice(0, 12)
+        .forEach((f) =>
+          console.log(
+            `• ${short(f.id)}  (${f.frequency}×) ${f.summary.slice(0, 120)}`
+          )
+        );
     }
+    if (memory.rawSnippets.length) {
+      console.log("\n--- Recent snippets ---");
+      memory.rawSnippets.slice(0, 6).forEach((s) => {
+        console.log(`• ${short(s.id)}  ${s.text.slice(0, 100).replace(/\n/g, " ")}`);
+      });
+    }
+    console.log("\nTip: archivist memory:show <id>  ·  archivist memory:rm <id>  ·  archivist memory:edit <id> -c \"...\"");
     console.log("");
   });
 

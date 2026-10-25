@@ -255,6 +255,51 @@ export class MemoryStore {
    */
 
   /** Remove a memory item by id across collections. */
+
+  /** Update style / architecture / pattern text by id (prefix match). */
+  async updateById(
+    repoId: string,
+    id: string,
+    content: string
+  ): Promise<boolean> {
+    const memory = await this.require(repoId);
+    const text = content.trim();
+    if (!text) return false;
+
+    const style = memory.styleRules.find(
+      (r) => r.id === id || r.id.startsWith(id)
+    );
+    if (style) {
+      style.rule = text;
+      style.updatedAt = new Date().toISOString();
+      style.embedding = (await embed(text)) ?? undefined;
+      await this.save(memory);
+      return true;
+    }
+
+    const arch = memory.architectureNotes.find(
+      (n) => n.id === id || n.id.startsWith(id)
+    );
+    if (arch) {
+      arch.note = text;
+      arch.embedding = (await embed(text)) ?? undefined;
+      await this.save(memory);
+      return true;
+    }
+
+    const pat = memory.patterns.find(
+      (x) => x.id === id || x.id.startsWith(id)
+    );
+    if (pat) {
+      pat.description = text;
+      pat.embedding = (await embed(text)) ?? undefined;
+      await this.save(memory);
+      return true;
+    }
+
+    return false;
+  }
+
   async removeById(
     repoId: string,
     id: string

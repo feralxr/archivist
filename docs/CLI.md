@@ -73,6 +73,7 @@ Lists all memory files in the data directory (all projects).
 archivist memory                 # list items (see ids in JSON / show)
 archivist memory:show <id>
 archivist memory:rm <id>         # prefix match ok
+archivist memory:edit <id> -c "New rule text"
 ```
 
 ### `archivist memory:add`

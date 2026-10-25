@@ -251,54 +251,66 @@ export class ReviewEngine {
     const maxChunks = Math.min(chunks.length, 4);
     const selected = chunks.slice(0, maxChunks);
 
-    for (const chunk of selected) {
-      const memoryContext = await memoryStore.buildContext(
-        repoId,
-        chunk.text.slice(0, 4_000)
+    // Review chunks with limited parallelism (2 at a time)
+    const concurrency = 2;
+    for (let i = 0; i < selected.length; i += concurrency) {
+      const batch = selected.slice(i, i + concurrency);
+      const results = await Promise.all(
+        batch.map(async (chunk) => {
+          const memoryContext = await memoryStore.buildContext(
+            repoId,
+            chunk.text.slice(0, 4_000)
+          );
+          const userPrompt = buildUserPrompt({
+            memoryContext,
+            diff: chunk.text,
+            title: `${title || "PR"} [chunk ${chunk.index + 1}/${chunks.length}: ${chunk.paths.slice(0, 3).join(", ")}]`,
+            body,
+            diffStats: stats,
+          });
+          try {
+            const raw = await this.model.review({
+              diff: chunk.text,
+              memoryContext: userPrompt,
+              systemInstructions: REVIEW_SYSTEM_PROMPT,
+            });
+            const parsed = extractJSON(raw);
+            if (!parsed) return { parseFallback: true as const };
+            const validated = reviewResponseSchema.safeParse(parsed);
+            if (!validated.success) return { parseFallback: true as const };
+            const paths = new Set(chunk.paths);
+            const comments = postProcessComments(
+              validated.data.comments,
+              paths,
+              memoryContext
+            );
+            return {
+              summary: validated.data.summary,
+              comments,
+              memoryContext,
+              parseFallback: false as const,
+            };
+          } catch (err) {
+            log.warn("Chunk review failed", {
+              chunk: chunk.index,
+              error: err instanceof Error ? err.message : String(err),
+            });
+            return { parseFallback: true as const };
+          }
+        })
       );
-      memoryItemsUsed = Math.max(
-        memoryItemsUsed,
-        countMemoryBullets(memoryContext)
-      );
-      memoryChars = Math.max(memoryChars, memoryContext.length);
 
-      const userPrompt = buildUserPrompt({
-        memoryContext,
-        diff: chunk.text,
-        title: `${title || "PR"} [chunk ${chunk.index + 1}/${chunks.length}: ${chunk.paths.slice(0, 3).join(", ")}]`,
-        body,
-        diffStats: stats,
-      });
-
-      try {
-        const raw = await this.model.review({
-          diff: chunk.text,
-          memoryContext: userPrompt,
-          systemInstructions: REVIEW_SYSTEM_PROMPT,
-        });
-        const parsed = extractJSON(raw);
-        if (!parsed) {
-          parseFallback = true;
-          continue;
+      for (const r of results) {
+        if (r.parseFallback) parseFallback = true;
+        if ("summary" in r && r.summary) summaries.push(r.summary);
+        if ("comments" in r && r.comments) allComments.push(...r.comments);
+        if ("memoryContext" in r && r.memoryContext) {
+          memoryItemsUsed = Math.max(
+            memoryItemsUsed,
+            countMemoryBullets(r.memoryContext)
+          );
+          memoryChars = Math.max(memoryChars, r.memoryContext.length);
         }
-        const validated = reviewResponseSchema.safeParse(parsed);
-        if (!validated.success) {
-          parseFallback = true;
-          continue;
-        }
-        if (validated.data.summary) summaries.push(validated.data.summary);
-        const paths = new Set(chunk.paths);
-        const comments = postProcessComments(
-          validated.data.comments,
-          paths,
-          memoryContext
-        );
-        allComments.push(...comments);
-      } catch (err) {
-        log.warn("Chunk review failed", {
-          chunk: chunk.index,
-          error: err instanceof Error ? err.message : String(err),
-        });
       }
     }
 
