@@ -178,6 +178,7 @@ archivist review --fail-on warning
 archivist review --fail-on suggestion
 archivist review --report review.md
 archivist review --save
+archivist review:last
 ```
 
 | Flag | Description |

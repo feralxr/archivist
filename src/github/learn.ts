@@ -100,3 +100,72 @@ export async function handleReviewSubmitted(event: ReviewEvent) {
     });
   }
 }
+
+type ReviewCommentEvent = EmitterWebhookEvent<"pull_request_review_comment">;
+
+/**
+ * Learn from individual inline review comments (threads / replies).
+ */
+export async function handleReviewCommentCreated(event: ReviewCommentEvent) {
+  const { payload } = event;
+  if (payload.action !== "created") return;
+
+  const comment = payload.comment;
+  const repo = payload.repository;
+  const pr = payload.pull_request;
+  const installationId = payload.installation?.id;
+
+  if (!installationId) return;
+  if (comment.user?.type === "Bot") return;
+
+  const login = comment.user?.login?.toLowerCase() || "";
+  if (login.includes("archivist")) return;
+
+  const body = (comment.body || "").trim();
+  if (body.length < 30 || body.length > 2000) return;
+  if (/^(lgtm|looks good|ship it|nit)\.?$/i.test(body)) return;
+
+  const repoId = String(repo.id);
+  const repoFullName = repo.full_name;
+
+  log.info("Learning from inline review comment", {
+    repo: repoFullName,
+    pr: pr.number,
+    path: comment.path,
+    author: comment.user?.login,
+  });
+
+  try {
+    await memoryStore.getOrCreate(repoId, repoFullName);
+
+    await memoryStore.addRawSnippet(repoId, {
+      text: body,
+      path: comment.path,
+      prNumber: pr.number,
+      author: comment.user?.login,
+      createdAt: comment.created_at,
+    });
+
+    if (body.length <= 280) {
+      await memoryStore.addHistoricalFeedback(repoId, {
+        summary: body.replace(/\s+/g, " ").trim(),
+        prNumber: pr.number,
+        frequency: 1,
+        lastSeen: comment.created_at,
+      });
+    }
+
+    // Light promote pass — cheap and keeps memory warm
+    const { promoted } = await promoteFeedback(repoId);
+    if (promoted > 0) {
+      log.info("Promoted rules from inline comment", {
+        repo: repoFullName,
+        promoted,
+      });
+    }
+  } catch (err) {
+    log.error("Inline comment learning failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}

@@ -666,6 +666,47 @@ program
     }
   });
 
+
+program
+  .command("review:last")
+  .description("Show the last saved review (--save)")
+  .option("--json", "Raw JSON")
+  .action(async (opts: { json?: boolean }) => {
+    workDir();
+    const { join } = await import("node:path");
+    const dir = process.env.ARCHIVIST_DATA_DIR || join(process.cwd(), ".archivist");
+    const path = join(dir, "last-review.json");
+    if (!existsSync(path)) {
+      console.error("No saved review. Run: archivist review --save");
+      process.exit(1);
+    }
+    const data = JSON.parse(readFileSync(path, "utf-8"));
+    if (opts.json) {
+      console.log(JSON.stringify(data, null, 2));
+      return;
+    }
+    const result = data.result || data;
+    console.log(`Saved at : ${data.at || "unknown"}`);
+    console.log(`Memory   : ${data.memoryId || "?"}`);
+    console.log(`Model    : ${result.modelUsed || "?"}\n`);
+    console.log("=== Summary ===");
+    console.log(result.summary || "");
+    console.log("");
+    const comments = result.comments || [];
+    if (!comments.length) {
+      console.log("No issues found.");
+    } else {
+      console.log(`=== Comments (${comments.length}) ===\n`);
+      for (const c of comments) {
+        const loc = c.line ? `${c.path}:${c.line}` : c.path;
+        console.log(`[${(c.severity || "?").toUpperCase()}] ${loc}`);
+        console.log(`  ${c.body}`);
+        if (c.explanation) console.log(`  why: ${c.explanation}`);
+        console.log("");
+      }
+    }
+  });
+
 program
   .command("models")
   .description("Show active model")

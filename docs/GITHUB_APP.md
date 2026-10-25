@@ -22,6 +22,7 @@ This is the product path: install once, get memory-aware reviews on every PR.
 4. **Subscribe to events**
    - Pull request  
    - Pull request review  
+   - Pull request review comment  
    - Installation  
    - Installation repositories  
 
@@ -91,6 +92,7 @@ On install, Archivist **bootstraps memory** from recent merged PRs (unless `ARCH
 | PR synchronize | Re-review (deduped per head SHA) |
 | ready_for_review | Review |
 | Human review submitted | Learn into memory |
+| Inline review comment | Learn snippet + light promote |
 | Installation / repos added | Bootstrap memory |
 | Bot PRs | Skipped |
 | Label `archivist:skip` | Skipped |

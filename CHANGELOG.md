@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.5
+
+### Deepened
+- Learn from **inline review comments** (`pull_request_review_comment.created`)
+- `archivist review:last` — replay last `--save` review
+- GitHub App docs: subscribe to review comment events
+
 ## 0.3.4
 
 ### Deepened

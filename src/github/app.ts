@@ -3,7 +3,7 @@ import { createNodeMiddleware } from "@octokit/app";
 import type { Octokit } from "@octokit/rest";
 import { env, getPrivateKey, requireGitHubApp } from "../core/config.js";
 import { handlePullRequestEvent } from "./handlers.js";
-import { handleReviewSubmitted } from "./learn.js";
+import { handleReviewSubmitted, handleReviewCommentCreated } from "./learn.js";
 import {
   handleInstallationCreated,
   handleInstallationReposAdded,
@@ -38,6 +38,11 @@ export function createGitHubApp() {
 
   app.webhooks.on("pull_request_review.submitted", async (event) => {
     await handleReviewSubmitted(event);
+  });
+
+  // Inline review comments / thread replies
+  app.webhooks.on("pull_request_review_comment.created", async (event) => {
+    await handleReviewCommentCreated(event);
   });
 
   // Day-1 memory: bootstrap when installed on repos
