@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.6
+
+### Webhook reliability
+- Delivery-id tracking (skip successful duplicates, allow failed redeliveries)
+- Handler errors propagate as 500 so GitHub retries
+- Model review path uses withRetry before failing delivery
+- Metrics: webhookRetries, duplicates, completed, failures + deliveryStats
+- docs/WEBHOOKS.md
+
 ## 0.3.5
 
 ### Deepened

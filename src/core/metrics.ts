@@ -9,6 +9,10 @@ export interface MetricsSnapshot {
   commentsPosted: number;
   bootstrapsCompleted: number;
   webhooksReceived: number;
+  webhookRetries: number;
+  webhookDuplicates: number;
+  webhookCompleted: number;
+  webhookFailures: number;
   startedAt: string;
   uptimeSeconds: number;
 }
@@ -22,6 +26,10 @@ const counters = {
   commentsPosted: 0,
   bootstrapsCompleted: 0,
   webhooksReceived: 0,
+  webhookRetries: 0,
+  webhookDuplicates: 0,
+  webhookCompleted: 0,
+  webhookFailures: 0,
 };
 
 export const metrics = {

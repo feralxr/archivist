@@ -14,6 +14,7 @@
 | Local review on your laptop | [CLI.md](./CLI.md) |
 | Automatic PR reviews | [GITHUB_APP.md](./GITHUB_APP.md) |
 | Host the App | [DEPLOY.md](./DEPLOY.md) |
+| Webhook retries | [WEBHOOKS.md](./WEBHOOKS.md) |
 | CI gate with `--fail-on` | [CI_REVIEW.md](./CI_REVIEW.md) |
 
 ## Deep dives

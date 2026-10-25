@@ -8,3 +8,4 @@ export {
   handleInstallationReposAdded,
 } from "./installation.js";
 export { publishCheckRun } from "./checks.js";
+export { beginDelivery, completeDelivery, failDelivery, deliveryStats } from "./delivery.js";

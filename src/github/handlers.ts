@@ -180,12 +180,29 @@ export async function handlePullRequestEvent(
       const model = createModelFromEnv();
       const engine = new ReviewEngine(model);
 
-      const result = await engine.review({
-        repoId,
-        diff: diffText,
-        title: pr.title,
-        body: pr.body || undefined,
-      });
+      // Retry only the model call — avoid duplicate PR reviews on partial failure
+      const result = await withRetry(
+        () =>
+          engine.review({
+            repoId,
+            diff: diffText,
+            title: pr.title,
+            body: pr.body || undefined,
+          }),
+        {
+          retries: 3,
+          minDelayMs: 1000,
+          maxDelayMs: 15_000,
+          onRetry: (err, attempt) => {
+            log.warn("Model review retry", {
+              repo: repoFullName,
+              pr: pr.number,
+              attempt,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          },
+        }
+      );
 
       log.info("Review complete", {
         repo: repoFullName,
@@ -194,6 +211,7 @@ export async function handlePullRequestEvent(
         model: result.modelUsed,
       });
 
+      // Post once (each has its own internal withRetry for GitHub API flakes)
       await postReviewComments(octokit, {
         owner: repo.owner.login,
         repo: repo.name,
@@ -214,11 +232,12 @@ export async function handlePullRequestEvent(
       metrics.inc("commentsPosted", result.comments.length);
     } catch (err) {
       metrics.inc("reviewsFailed");
-      log.error("Handler failed", {
+      log.error("Handler failed — will surface 500 for GitHub retry", {
         repo: repoFullName,
         pr: pr.number,
         error: err instanceof Error ? err.message : String(err),
       });
+      throw err;
     }
   });
 }

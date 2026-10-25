@@ -4,6 +4,7 @@ import { env, hasGitHubApp, hasAnyModelKey } from "./core/config.js";
 import { log } from "./core/logger.js";
 import { reviewQueue } from "./core/queue.js";
 import { metrics } from "./core/metrics.js";
+import { deliveryStats } from "./github/delivery.js";
 
 async function main() {
   console.log("╔══════════════════════════════════════╗");
@@ -51,7 +52,7 @@ async function main() {
 
     if (url === "/metrics") {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ...metrics.snapshot(), queue: reviewQueue.stats }));
+      res.end(JSON.stringify({ ...metrics.snapshot(), queue: reviewQueue.stats, deliveries: deliveryStats() }));
       return;
     }
 
