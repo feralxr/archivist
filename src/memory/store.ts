@@ -257,53 +257,91 @@ export class MemoryStore {
     const memory = await this.get(repoId);
     if (!memory) return "No project memory available yet.";
 
-    const budget = 3500; // approximate chars for memory section
+    // Priority-ordered token budget for the memory section of the prompt
+    const budget = 4_500;
     const parts: string[] = [];
     let used = 0;
 
-    const addSection = (title: string, lines: string[]) => {
-      if (!lines.length) return;
-      const block = `${parts.length ? "\n" : ""}### ${title}\n${lines.map((l) => `- ${l}`).join("\n")}`;
+    const header = [
+      `Repository: ${memory.repoName}`,
+      memory.remoteUrl ? `Remote: ${memory.remoteUrl}` : null,
+      `Memory version: ${memory.metadata.version} · PRs analyzed: ${memory.metadata.prsAnalyzed}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    parts.push(header);
+    used += header.length;
+
+    const addSection = (title: string, lines: string[], maxLines: number) => {
+      const sliced = lines.filter(Boolean).slice(0, maxLines);
+      if (!sliced.length) return;
+      const block = `\n### ${title}\n${sliced.map((l) => `- ${l}`).join("\n")}`;
       if (used + block.length > budget) return;
       parts.push(block);
       used += block.length;
     };
 
-    addSection(
-      "Style Rules",
-      memory.styleRules.slice(0, 15).map((r) => r.rule)
+    // High-confidence / manual rules first
+    const styles = [...memory.styleRules].sort(
+      (a, b) => (b.confidence ?? 0) - (a.confidence ?? 0)
     );
     addSection(
-      "Architecture Notes",
-      memory.architectureNotes.slice(0, 10).map((n) => n.note)
+      "Style Rules (authoritative)",
+      styles.map((r) => {
+        const src = r.source ? ` [${r.source}]` : "";
+        const conf =
+          typeof r.confidence === "number" ? ` (conf ${r.confidence.toFixed(2)})` : "";
+        return `${r.rule}${src}${conf}`;
+      }),
+      18
     );
 
-    const preferred = memory.patterns.filter((p) => p.preferred).slice(0, 8);
-    const discouraged = memory.patterns.filter((p) => !p.preferred).slice(0, 8);
+    addSection(
+      "Architecture Notes (authoritative)",
+      memory.architectureNotes.map((n) => {
+        const tags = n.tags?.length ? ` {${n.tags.join(", ")}}` : "";
+        return `${n.note}${tags}`;
+      }),
+      12
+    );
+
+    const preferred = memory.patterns.filter((p) => p.preferred);
+    const discouraged = memory.patterns.filter((p) => !p.preferred);
     addSection(
       "Preferred Patterns",
-      preferred.map((p) => p.description)
+      preferred.map((p) => p.description),
+      10
     );
     addSection(
       "Discouraged Patterns",
-      discouraged.map((p) => p.description)
+      discouraged.map((p) => p.description),
+      10
     );
 
-    const feedback = memory.historicalFeedback
-      .sort((a, b) => b.frequency - a.frequency)
-      .slice(0, 10)
-      .map((f) => `${f.summary} (seen ${f.frequency}×)`);
-    addSection("Recurring Review Feedback", feedback);
+    const feedback = [...memory.historicalFeedback]
+      .sort((a, b) => b.frequency - a.frequency || b.lastSeen.localeCompare(a.lastSeen))
+      .slice(0, 12)
+      .map((f) => {
+        const pr = f.prNumber ? ` PR#${f.prNumber}` : "";
+        return `${f.summary} (seen ${f.frequency}×${pr})`;
+      });
+    addSection("Recurring Human Review Feedback", feedback, 12);
 
-    if (diffSnippet) {
-      const relevant = await this.search(repoId, diffSnippet, 8);
+    if (diffSnippet.trim()) {
+      const relevant = await this.search(repoId, diffSnippet, 10);
       addSection(
         "Most Relevant to this change",
-        relevant.map((r) => `(${r.type}) ${r.content.slice(0, 200)}`)
+        relevant.map(
+          (r) =>
+            `(${r.type}, score ${r.score.toFixed(2)}) ${r.content.slice(0, 220)}`
+        ),
+        10
       );
     }
 
-    return parts.length ? parts.join("\n") : "No project memory available yet.";
+    return parts.length > 1
+      ? parts.join("\n")
+      : "No project memory available yet.";
   }
 
   /**

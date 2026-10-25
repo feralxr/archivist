@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+### Deepened features
+- **Review engine**: path validation against diff, severity ranking, noise filters, confidence scores, memoryRefs, richer meta
+- **Prompts**: exhaustive memory-first system prompt with severity/category discipline
+- **Memory context**: priority-ordered sections with confidence/source and relevance search
+- **Learning**: stronger promote/infer heuristics + quality breakdown
+- **CLI/GitHub output**: confidence, memory citations, review meta
+
 ## 0.2.2
 
 ### Added

@@ -15,33 +15,37 @@ export async function promoteFeedback(repoId: string): Promise<{
 
   let promoted = 0;
   const existingRules = new Set(
-    memory.styleRules.map((r) => r.rule.toLowerCase())
+    memory.styleRules.map((r) => normalizeKey(r.rule))
+  );
+  const existingPatterns = new Set(
+    memory.patterns.map((p) => normalizeKey(p.description))
   );
 
   for (const fb of memory.historicalFeedback) {
     if (fb.frequency < 2) continue;
     const summary = fb.summary.trim();
-    if (summary.length < 20 || summary.length > 200) continue;
-    if (existingRules.has(summary.toLowerCase())) continue;
+    if (summary.length < 20 || summary.length > 220) continue;
+    const key = normalizeKey(summary);
+    if (existingRules.has(key) || existingPatterns.has(key)) continue;
 
-    // Heuristic: imperative / style-like language → style rule
     if (looksLikeStyleRule(summary)) {
       await memoryStore.addStyleRule(repoId, {
         rule: cleanRule(summary),
         source: "review",
-        confidence: Math.min(0.5 + fb.frequency * 0.1, 0.95),
+        confidence: Math.min(0.5 + fb.frequency * 0.08, 0.92),
       });
-      existingRules.add(summary.toLowerCase());
+      existingRules.add(key);
       promoted++;
       continue;
     }
 
     if (looksLikePattern(summary)) {
-      const preferred = !/don'?t|avoid|never|discourag/i.test(summary);
+      const preferred = !/don'?t|avoid|never|discourag|do not/i.test(summary);
       await memoryStore.addPattern(repoId, {
         description: cleanRule(summary),
         preferred,
       });
+      existingPatterns.add(key);
       promoted++;
     }
   }
@@ -59,27 +63,26 @@ export async function inferFromSnippets(repoId: string): Promise<{
 
   let inferred = 0;
   const candidates = rankSnippetCandidates(memory.rawSnippets);
+  const existing = new Set(memory.styleRules.map((r) => normalizeKey(r.rule)));
 
-  for (const text of candidates.slice(0, 15)) {
+  for (const text of candidates.slice(0, 20)) {
     if (!looksLikeStyleRule(text) && !looksLikePattern(text)) continue;
 
     const rule = cleanRule(text);
     if (rule.length < 16 || rule.length > 180) continue;
-
-    const already = memory.styleRules.some(
-      (r) => r.rule.toLowerCase() === rule.toLowerCase()
-    );
-    if (already) continue;
+    const key = normalizeKey(rule);
+    if (existing.has(key)) continue;
 
     if (looksLikeStyleRule(text)) {
       await memoryStore.addStyleRule(repoId, {
         rule,
         source: "inferred",
-        confidence: 0.55,
+        confidence: 0.52,
       });
+      existing.add(key);
       inferred++;
     } else if (looksLikePattern(text)) {
-      const preferred = !/don'?t|avoid|never|discourag/i.test(text);
+      const preferred = !/don'?t|avoid|never|discourag|do not/i.test(text);
       await memoryStore.addPattern(repoId, {
         description: rule,
         preferred,
@@ -113,22 +116,24 @@ function looksLikeStyleRule(text: string): boolean {
     "always ",
     "never ",
     "don't ",
+    "do not ",
     "avoid ",
     "must ",
     "should ",
     "naming",
     "semicolon",
-    "import",
-    "export",
+    "import ",
+    "export ",
     "async",
     "await",
     "type ",
-    "interface",
+    "interface ",
     "const ",
-    "let ",
     "early return",
     "error handling",
     "logging",
+    "public api",
+    "breaking change",
   ];
   return cues.some((c) => t.includes(c));
 }
@@ -141,7 +146,9 @@ function looksLikePattern(text: string): boolean {
     t.includes("rather than") ||
     t.includes("we usually") ||
     t.includes("in this codebase") ||
-    t.includes("convention")
+    t.includes("convention") ||
+    t.includes("we prefer") ||
+    t.includes("team standard")
   );
 }
 
@@ -153,14 +160,17 @@ function cleanRule(text: string): string {
     .trim();
 }
 
+function normalizeKey(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
 function rankSnippetCandidates(snippets: RawSnippet[]): string[] {
-  // Prefer concise, recent, non-bot-looking comments
   return [...snippets]
-    .filter((s) => s.text && s.text.length >= 24 && s.text.length <= 280)
+    .filter((s) => s.text && s.text.length >= 24 && s.text.length <= 300)
+    .filter((s) => !/lgtm|looks good|nit:?\s*$/i.test(s.text.trim()))
     .sort((a, b) => {
-      // shorter-is-better among candidates, slight recency bias
-      const lenScore = Math.abs(80 - a.text.length) - Math.abs(80 - b.text.length);
-      return lenScore;
+      // Prefer lengths near ~80 chars (often a single clear instruction)
+      return Math.abs(80 - a.text.length) - Math.abs(80 - b.text.length);
     })
     .map((s) => s.text.trim());
 }
@@ -169,32 +179,56 @@ export function memoryQualityScore(memory: ProjectMemory): {
   score: number;
   label: string;
   tips: string[];
+  breakdown: Record<string, number>;
 } {
   const tips: string[] = [];
-  let score = 0;
+  const breakdown = {
+    style: Math.min(memory.styleRules.length * 8, 32),
+    architecture: Math.min(memory.architectureNotes.length * 8, 24),
+    patterns: Math.min(memory.patterns.length * 5, 20),
+    feedback: Math.min(memory.historicalFeedback.length * 3, 15),
+    snippets: Math.min(memory.rawSnippets.length, 9),
+  };
 
-  score += Math.min(memory.styleRules.length * 8, 32);
-  score += Math.min(memory.architectureNotes.length * 8, 24);
-  score += Math.min(memory.patterns.length * 5, 20);
-  score += Math.min(memory.historicalFeedback.length * 3, 15);
-  score += Math.min(memory.rawSnippets.length, 9);
+  let score =
+    breakdown.style +
+    breakdown.architecture +
+    breakdown.patterns +
+    breakdown.feedback +
+    breakdown.snippets;
+
+  // Bonus for evidence of real usage
+  if (memory.metadata.prsAnalyzed >= 5) score = Math.min(100, score + 5);
+  if (memory.metadata.lastBootstrapAt) score = Math.min(100, score + 3);
 
   if (memory.styleRules.length < 3) {
-    tips.push("Add style rules: archivist memory:add -t style -c \"...\"");
+    tips.push('Add style rules: archivist memory:add -t style -c "..."');
   }
   if (memory.architectureNotes.length < 1) {
-    tips.push("Add architecture notes: archivist memory:add -t architecture -c \"...\"");
+    tips.push(
+      'Add architecture notes: archivist memory:add -t architecture -c "..."'
+    );
   }
   if (memory.historicalFeedback.length + memory.rawSnippets.length < 5) {
-    tips.push("Run bootstrap or review more PRs so Archivist can learn");
+    tips.push(
+      "Run archivist memory:bootstrap owner/repo or review more PRs so Archivist can learn"
+    );
   }
   if (memory.metadata.prsAnalyzed === 0) {
-    tips.push("No PRs analyzed yet — install the GitHub App or import history");
+    tips.push(
+      "No PRs analyzed yet — install the GitHub App or run memory:bootstrap"
+    );
   }
 
   score = Math.min(100, score);
   const label =
-    score >= 70 ? "strong" : score >= 40 ? "useful" : score >= 15 ? "thin" : "empty";
+    score >= 70
+      ? "strong"
+      : score >= 40
+        ? "useful"
+        : score >= 15
+          ? "thin"
+          : "empty";
 
-  return { score, label, tips };
+  return { score, label, tips, breakdown };
 }

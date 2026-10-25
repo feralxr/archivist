@@ -26,6 +26,8 @@ export type CommentCategory =
   | "refactor"
   | "security"
   | "performance"
+  | "testing"
+  | "docs"
   | "other";
 
 export interface ReviewComment {
@@ -34,8 +36,31 @@ export interface ReviewComment {
   body: string;
   severity: CommentSeverity;
   category: CommentCategory;
-  /** Why this comment was made (linked to project memory) */
+  /** Why this comment was made — preferably cites project memory */
   explanation?: string;
+  /** Optional confidence 0–1 from post-processing */
+  confidence?: number;
+  /** Memory rule ids or short fingerprints this comment relates to */
+  memoryRefs?: string[];
+}
+
+export interface DiffStatsSummary {
+  files: number;
+  codeFiles: number;
+  docFiles: number;
+  added: number;
+  removed: number;
+  docsOnly: boolean;
+}
+
+export interface ReviewMeta {
+  durationMs?: number;
+  memoryChars?: number;
+  memoryItemsUsed?: number;
+  diffChars?: number;
+  diffStats?: DiffStatsSummary;
+  truncatedDiff?: boolean;
+  parseFallback?: boolean;
 }
 
 export interface ProjectMemorySnapshot {
@@ -52,4 +77,5 @@ export interface ReviewResult {
   comments: ReviewComment[];
   summary: string;
   modelUsed: string;
+  meta?: ReviewMeta;
 }

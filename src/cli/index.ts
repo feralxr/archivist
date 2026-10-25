@@ -454,13 +454,34 @@ program
                 : c.severity === "suggestion"
                   ? "SUGGEST"
                   : "INFO";
-          console.log(`[${badge}] ${loc} (${c.category})`);
+          const conf =
+            typeof c.confidence === "number"
+              ? ` · conf ${(c.confidence * 100).toFixed(0)}%`
+              : "";
+          console.log(`[${badge}] ${loc} (${c.category}${conf})`);
           console.log(`  ${c.body}`);
           if (c.explanation) console.log(`  why: ${c.explanation}`);
+          if (c.memoryRefs?.length) {
+            console.log(`  memory: ${c.memoryRefs.join(" · ")}`);
+          }
           console.log("");
         }
       }
-      console.log(`Done in ${ms}ms · ${result.modelUsed}`);
+      if (result.meta) {
+        const m = result.meta;
+        const bits = [
+          m.durationMs != null ? `${m.durationMs}ms` : null,
+          result.modelUsed,
+          m.memoryItemsUsed != null ? `memory×${m.memoryItemsUsed}` : null,
+          m.diffStats
+            ? `files ${m.diffStats.files} (+${m.diffStats.added}/-${m.diffStats.removed})`
+            : null,
+          m.truncatedDiff ? "diff-truncated" : null,
+        ].filter(Boolean);
+        console.log(`Done · ${bits.join(" · ")}`);
+      } else {
+        console.log(`Done in ${ms}ms · ${result.modelUsed}`);
+      }
     }
 
     // CI-friendly exit codes
@@ -609,9 +630,16 @@ program
     const q = memoryQualityScore(memory);
     console.log(`\n${memory.repoName}`);
     console.log(`Quality: ${q.score}/100 (${q.label})\n`);
+    if (q.breakdown) {
+      console.log("Breakdown:");
+      for (const [k, v] of Object.entries(q.breakdown)) {
+        console.log(`  ${k.padEnd(14)} ${v}`);
+      }
+      console.log("");
+    }
     if (q.tips.length) {
       console.log("Tips to improve:");
-      q.tips.forEach((t) => console.log(`  • ${t}`));
+      q.tips.forEach((tip) => console.log(`  • ${tip}`));
       console.log("");
     }
   });

@@ -107,7 +107,9 @@ function toInline(c: ReviewComment) {
   if (c.explanation) {
     body += `\n\n> **Why:** ${c.explanation}`;
   }
-  // Severity badge in comment for scanability
+  if (c.memoryRefs?.length) {
+    body += `\n> **Memory:** ${c.memoryRefs.slice(0, 2).join(" · ")}`;
+  }
   const badge =
     c.severity === "error"
       ? "🔴"
@@ -116,7 +118,11 @@ function toInline(c: ReviewComment) {
         : c.severity === "suggestion"
           ? "🔵"
           : "⚪";
-  body = `${badge} **${c.severity}** · \`${c.category}\`\n\n${body}`;
+  const conf =
+    typeof c.confidence === "number"
+      ? ` · ${Math.round(c.confidence * 100)}%`
+      : "";
+  body = `${badge} **${c.severity}** · \`${c.category}\`${conf}\n\n${body}`;
   body += `\n\n<!-- archivist:${c.category}:${c.severity} -->`;
   return { path: c.path, line: c.line, body };
 }
