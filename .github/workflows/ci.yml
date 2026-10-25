@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
 
@@ -18,10 +18,10 @@ jobs:
           node-version: "22"
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund --ignore-scripts --prefer-offline=false
+        run: npm install --no-audit --no-fund --ignore-scripts
 
       - name: Typecheck
         run: npx tsc --noEmit
 
       - name: Core tests
-        run: npm run test:core
+        run: ARCHIVIST_SKIP_LIVE=1 npx tsx scripts/test-all.ts
