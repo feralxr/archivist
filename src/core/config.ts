@@ -30,6 +30,9 @@ const envSchema = z.object({
     .default("development"),
   PORT: z.coerce.number().default(3000),
   ARCHIVIST_DATA_DIR: z.string().optional(),
+  ARCHIVIST_MAX_COMMENTS: z.coerce.number().int().min(1).max(20).default(8),
+  ARCHIVIST_CHUNK_CONCURRENCY: z.coerce.number().int().min(1).max(4).default(2),
+  ARCHIVIST_SKIP_DOCS_ONLY: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

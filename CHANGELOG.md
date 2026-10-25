@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.4
+
+### Deepened
+- Eval cases: SQL injection + API/UI boundary violations
+- `ARCHIVIST_MAX_COMMENTS` / `ARCHIVIST_CHUNK_CONCURRENCY` config
+- `review --report <path>` markdown report
+- `review --save` writes `.archivist/last-review.json`
+
 ## 0.3.3
 
 ### Deepened

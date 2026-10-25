@@ -9,6 +9,7 @@ import type {
 import { memoryStore } from "../memory/store.js";
 import { REVIEW_SYSTEM_PROMPT, buildUserPrompt } from "./prompts.js";
 import { log } from "../core/logger.js";
+import { env } from "../core/config.js";
 import { analyzeDiff } from "./diff-stats.js";
 import { chunkDiff } from "./chunk.js";
 
@@ -37,7 +38,9 @@ const reviewResponseSchema = z.object({
   comments: z.array(commentSchema),
 });
 
-const MAX_COMMENTS = 8;
+function maxComments(): number {
+  return env.ARCHIVIST_maxComments() ?? 8;
+}
 const MIN_BODY_LENGTH = 28;
 const MAX_BODY_LENGTH = 1_200;
 
@@ -252,7 +255,7 @@ export class ReviewEngine {
     const selected = chunks.slice(0, maxChunks);
 
     // Review chunks with limited parallelism (2 at a time)
-    const concurrency = 2;
+    const concurrency = env.ARCHIVIST_CHUNK_CONCURRENCY ?? 2;
     for (let i = 0; i < selected.length; i += concurrency) {
       const batch = selected.slice(i, i + concurrency);
       const results = await Promise.all(
@@ -323,7 +326,7 @@ export class ReviewEngine {
       if (seen.has(key)) continue;
       seen.add(key);
       merged.push(c);
-      if (merged.length >= MAX_COMMENTS) break;
+      if (merged.length >= maxComments()) break;
     }
 
     const summary =
@@ -415,7 +418,7 @@ function postProcessComments(
     return (b.confidence ?? 0) - (a.confidence ?? 0);
   });
 
-  return out.slice(0, MAX_COMMENTS);
+  return out.slice(0, maxComments());
 }
 
 function pathInDiff(path: string, changed: Set<string>): boolean {

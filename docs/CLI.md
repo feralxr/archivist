@@ -176,6 +176,8 @@ archivist review --json
 archivist review --fail-on error
 archivist review --fail-on warning
 archivist review --fail-on suggestion
+archivist review --report review.md
+archivist review --save
 ```
 
 | Flag | Description |

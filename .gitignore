@@ -45,3 +45,5 @@ coverage/
 Thumbs.db
 
 fixtures/eval/last-results.json
+
+.archivist/last-review.json

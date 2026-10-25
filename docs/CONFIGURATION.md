@@ -61,6 +61,8 @@ Scopes for a PAT used only for bootstrap: public `repo` read is enough for publi
 |----------|---------|-------------|
 | `ARCHIVIST_BOOTSTRAP_ON_INSTALL` | `true` | Seed memory when the App is installed on a repo |
 | `ARCHIVIST_SKIP_DOCS_ONLY` | unset | If `true`/`1`, skip model review for docs-only diffs |
+| `ARCHIVIST_MAX_COMMENTS` | `8` | Max comments after post-processing (1–20) |
+| `ARCHIVIST_CHUNK_CONCURRENCY` | `2` | Parallel chunk reviews for large diffs (1–4) |
 | `ARCHIVIST_DATA_DIR` | `./.archivist` | Where memory JSON files are stored |
 | `PORT` | `3000` | HTTP port for the App server |
 | `NODE_ENV` | `development` | `development` \| `production` \| `test` |

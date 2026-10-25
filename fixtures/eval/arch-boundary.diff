@@ -1,0 +1,14 @@
+diff --git a/src/api/users.ts b/src/api/users.ts
+index 1111111..2222222 100644
+--- a/src/api/users.ts
++++ b/src/api/users.ts
+@@ -1,5 +1,8 @@
+ import { Router } from "express";
++import { Button } from "../ui/Button";
++
+ export const usersRouter = Router();
++
+ usersRouter.get("/", (_req, res) => {
+-  res.json([]);
++  res.json({ ui: Button.name, users: [] });
+ });

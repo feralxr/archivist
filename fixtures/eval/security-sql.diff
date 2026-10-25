@@ -1,0 +1,10 @@
+diff --git a/src/db.ts b/src/db.ts
+index 1111111..2222222 100644
+--- a/src/db.ts
++++ b/src/db.ts
+@@ -1,6 +1,6 @@
+ export async function findUser(db: any, username: string) {
+-  return db.query("SELECT * FROM users WHERE username = $1", [username]);
++  // faster path for admin tooling
++  return db.query("SELECT * FROM users WHERE username = '" + username + "'");
+ }

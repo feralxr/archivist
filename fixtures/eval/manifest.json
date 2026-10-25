@@ -5,12 +5,19 @@
       "diff": "bug-div-zero.diff",
       "title": "Remove redundant zero check",
       "memory": {
-        "styleRules": ["Prefer explicit error handling for edge cases"],
-        "discouraged": ["Silent failure on invalid input"]
+        "styleRules": [
+          "Prefer explicit error handling for edge cases"
+        ],
+        "discouraged": [
+          "Silent failure on invalid input"
+        ]
       },
       "expect": {
         "minComments": 1,
-        "mustHaveSeverity": ["error", "warning"],
+        "mustHaveSeverity": [
+          "error",
+          "warning"
+        ],
         "summaryNotEmpty": true
       }
     },
@@ -19,7 +26,9 @@
       "diff": "clean-semicolon.diff",
       "title": "Add missing semicolon",
       "memory": {
-        "styleRules": ["Prefer semicolons"]
+        "styleRules": [
+          "Prefer semicolons"
+        ]
       },
       "expect": {
         "maxComments": 2,
@@ -31,12 +40,20 @@
       "diff": "api-any.diff",
       "title": "Simplify createUser types",
       "memory": {
-        "styleRules": ["Avoid any in public APIs"],
-        "discouraged": ["Don't break public API without a major version"]
+        "styleRules": [
+          "Avoid any in public APIs"
+        ],
+        "discouraged": [
+          "Don't break public API without a major version"
+        ]
       },
       "expect": {
         "minComments": 1,
-        "mustHaveSeverity": ["error", "warning", "suggestion"],
+        "mustHaveSeverity": [
+          "error",
+          "warning",
+          "suggestion"
+        ],
         "summaryNotEmpty": true
       }
     },
@@ -47,6 +64,47 @@
       "memory": {},
       "expect": {
         "maxComments": 2,
+        "summaryNotEmpty": true
+      }
+    },
+    {
+      "id": "security-sql",
+      "diff": "security-sql.diff",
+      "title": "Speed up user lookup",
+      "memory": {
+        "styleRules": [
+          "Never concatenate SQL strings with user input"
+        ],
+        "discouraged": [
+          "String-built SQL queries"
+        ]
+      },
+      "expect": {
+        "minComments": 1,
+        "mustHaveSeverity": [
+          "error",
+          "warning"
+        ],
+        "summaryNotEmpty": true
+      }
+    },
+    {
+      "id": "arch-boundary",
+      "diff": "arch-boundary.diff",
+      "title": "Show button name in API",
+      "memory": {
+        "styleRules": [],
+        "discouraged": [
+          "API layer must not import UI modules"
+        ]
+      },
+      "expect": {
+        "minComments": 1,
+        "mustHaveSeverity": [
+          "error",
+          "warning",
+          "suggestion"
+        ],
         "summaryNotEmpty": true
       }
     }
