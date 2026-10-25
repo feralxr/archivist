@@ -217,38 +217,6 @@ program
       return;
     }
 
-    // Persist report / last review
-    if (opts.report) {
-      const md = buildMarkdownReport(result, {
-        title: opts.title,
-        memoryId: repoId,
-        ms,
-      });
-      writeFileSync(opts.report, md, "utf-8");
-      if (!opts.json) console.log(`Report written: ${opts.report}`);
-    }
-    if (opts.save) {
-      const { join } = await import("node:path");
-      const dir = process.env.ARCHIVIST_DATA_DIR || join(process.cwd(), ".archivist");
-      const { mkdirSync } = await import("node:fs");
-      try { mkdirSync(dir, { recursive: true }); } catch { /* ignore */ }
-      const out = join(dir, "last-review.json");
-      writeFileSync(
-        out,
-        JSON.stringify(
-          {
-            at: new Date().toISOString(),
-            memoryId: repoId,
-            result,
-          },
-          null,
-          2
-        ),
-        "utf-8"
-      );
-      if (!opts.json) console.log(`Saved: ${out}`);
-    }
-
     if (opts.json) {
       console.log(JSON.stringify(memory, null, 2));
       return;
@@ -346,7 +314,7 @@ program
       console.error("No memory. Run archivist init.");
       process.exit(1);
     }
-    const pools: Array<{ type: string; items: Array<{ id: string; [k: string]: unknown }> }> = [
+    const pools: Array<{ type: string; items: Array<{ id: string }> }> = [
       { type: "style", items: memory.styleRules },
       { type: "architecture", items: memory.architectureNotes },
       { type: "pattern", items: memory.patterns },
@@ -927,7 +895,7 @@ function buildMarkdownReport(
       confidence?: number;
     }>;
     modelUsed: string;
-    meta?: Record<string, unknown>;
+    meta?: unknown;
   },
   opts: { title?: string; memoryId: string; ms: number }
 ): string {

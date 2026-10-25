@@ -27,7 +27,7 @@ function trackDelivery<E extends { id: string }>(
   handler: (event: E) => Promise<void>
 ): (event: E) => Promise<void> {
   return async (event: E) => {
-    const { skip, attempts } = beginDelivery(event.id, eventName);
+    const { skip } = beginDelivery(event.id, eventName);
     if (skip) return;
 
     try {

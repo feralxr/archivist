@@ -39,7 +39,7 @@ const reviewResponseSchema = z.object({
 });
 
 function maxComments(): number {
-  return env.ARCHIVIST_maxComments() ?? 8;
+  return env.ARCHIVIST_MAX_COMMENTS ?? 8;
 }
 const MIN_BODY_LENGTH = 28;
 const MAX_BODY_LENGTH = 1_200;
