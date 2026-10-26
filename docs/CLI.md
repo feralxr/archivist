@@ -24,7 +24,8 @@ Prints setup instructions (model keys, GitHub App overview).
 
 ### `archivist doctor`
 
-Health check: which keys are present, whether the model client constructs, GitHub App env, local memory stats.
+Health check: keys, **resolved** review provider/model, GitHub App env, memory quality.
+App-only fields are soft warnings for CLI use. Non-zero exit on hard failures.
 
 ```bash
 archivist doctor

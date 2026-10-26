@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.9
+
+### Polish
+- Richer `doctor`: resolved review model, memory quality, soft App checks, exit code
+- `status` shows resolved provider/model
+- GitHub App review path uses review-role model selection
+
 ## 0.3.8
 
 ### Model selection

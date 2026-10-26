@@ -177,7 +177,7 @@ export async function handlePullRequestEvent(
         });
       }
 
-      const model = createModelFromEnv();
+      const model = createModelFromEnv({ role: "review" });
       const engine = new ReviewEngine(model);
 
       // Retry only the model call — avoid duplicate PR reviews on partial failure

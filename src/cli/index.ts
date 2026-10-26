@@ -16,7 +16,7 @@ const program = new Command();
 
 program
   .name("archivist")
-  .description("Memory-aware code review — local CLI and GitHub App")
+  .description("Memory-aware code review for GitHub — CLI + GitHub App")
   .version("0.1.0")
   .option("--cwd <path>", "Run as if started in this directory (for multi-repo workflows)");
 
@@ -43,7 +43,7 @@ Archivist setup
    ANTHROPIC_API_KEY=...    # Claude
    OPENAI_API_KEY=...       # GPT
    ARCHIVIST_PROVIDER=openai   # optional force
-   ARCHIVIST_MODEL=gpt-4o-mini
+   ARCHIVIST_MODEL=gpt-4o-mini\n   # archivist models --list
 
 2. Local workflow
    archivist init
@@ -85,19 +85,58 @@ program
     checks.push({
       name: "Any model key",
       ok: hasAnyModelKey(),
-      detail: hasAnyModelKey() ? "ok" : "missing — set OPENROUTER, ANTHROPIC, or OPENAI key",
+      detail: hasAnyModelKey()
+        ? "ok"
+        : "missing — set OPENROUTER_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY",
     });
+
+    // Resolve actual review model (not just env defaults)
+    if (hasAnyModelKey()) {
+      try {
+        const { resolveModelConfigFromEnv } = await import("../models/provider.js");
+        const cfg = resolveModelConfigFromEnv({ role: "review" });
+        const model = createModelFromEnv({ role: "review" });
+        checks.push({
+          name: "Review model",
+          ok: true,
+          detail: `${cfg.provider} / ${model.model}`,
+        });
+      } catch (err) {
+        checks.push({
+          name: "Review model",
+          ok: false,
+          detail: err instanceof Error ? err.message.split("\n")[0] : String(err),
+        });
+      }
+    } else {
+      checks.push({
+        name: "Review model",
+        ok: false,
+        detail: "unavailable without API key",
+      });
+    }
+
     checks.push({
       name: "GitHub App ID",
       ok: Boolean(env.GITHUB_APP_ID),
-      detail: env.GITHUB_APP_ID ? String(env.GITHUB_APP_ID) : "missing (only needed for server)",
+      detail: env.GITHUB_APP_ID
+        ? String(env.GITHUB_APP_ID)
+        : "not set (only needed for App server)",
     });
     checks.push({
       name: "GitHub Private Key",
       ok: Boolean(env.GITHUB_PRIVATE_KEY),
-      detail: env.GITHUB_PRIVATE_KEY ? "set" : "missing (only needed for server)",
+      detail: env.GITHUB_PRIVATE_KEY
+        ? "set"
+        : "not set (only needed for App server)",
     });
-    checks.push({ name: "Model", ok: true, detail: env.ARCHIVIST_MODEL });
+    checks.push({
+      name: "Webhook secret",
+      ok: Boolean(env.GITHUB_WEBHOOK_SECRET),
+      detail: env.GITHUB_WEBHOOK_SECRET
+        ? "set"
+        : "not set (only needed for App server)",
+    });
 
     const { repoId, repoName, remoteUrl } = resolveLocalRepoIdentity();
     const memory = await memoryStore.get(repoId);
@@ -110,32 +149,45 @@ program
     });
     if (remoteUrl) {
       checks.push({ name: "Git remote", ok: true, detail: remoteUrl });
+    } else {
+      checks.push({
+        name: "Git remote",
+        ok: true,
+        detail: "none (local-only identity)",
+      });
     }
 
-    if (hasAnyModelKey()) {
-      try {
-        const model = createModelFromEnv();
-        checks.push({
-          name: "Model client",
-          ok: true,
-          detail: `${model.name}/${model.model}`,
-        });
-      } catch (err) {
-        checks.push({
-          name: "Model client",
-          ok: false,
-          detail: err instanceof Error ? err.message : String(err),
-        });
-      }
+    if (memory) {
+      const q = memoryQualityScore(memory);
+      checks.push({
+        name: "Memory quality",
+        ok: q.score >= 15,
+        detail: `${q.score}/100 (${q.label})`,
+      });
     }
 
     for (const c of checks) {
-      console.log(`  ${c.ok ? "✓" : "✗"}  ${c.name.padEnd(20)} ${c.detail}`);
+      console.log(`  ${c.ok ? "✓" : "✗"}  ${c.name.padEnd(22)} ${c.detail}`);
     }
+
     const failed = checks.filter((c) => !c.ok).length;
-    console.log(
-      failed === 0 ? "\nAll good.\n" : `\n${failed} issue(s). Run archivist setup.\n`
-    );
+    // Keys for App-only are soft warnings if CLI-only
+    const hardFailed = checks.filter(
+      (c) =>
+        !c.ok &&
+        !["GitHub App ID", "GitHub Private Key", "Webhook secret"].includes(c.name)
+    ).length;
+
+    if (hardFailed === 0) {
+      console.log(
+        failed === 0
+          ? "\nAll good.\n"
+          : "\nCLI-ready. GitHub App fields optional until you run the server.\n"
+      );
+    } else {
+      console.log(`\n${hardFailed} issue(s). Run: archivist setup\n`);
+      process.exitCode = 1;
+    }
   });
 
 program
@@ -149,8 +201,17 @@ program
     console.log(`  Anthropic  : ${hasAnthropic() ? "yes" : "no"}`);
     console.log(`  OpenAI     : ${hasOpenAI() ? "yes" : "no"}`);
     console.log(`  GitHub App : ${hasGitHubApp() ? "yes" : "no"}`);
-    console.log(`  Model      : ${env.ARCHIVIST_MODEL}`);
-    if (env.ARCHIVIST_PROVIDER) console.log(`  Provider   : ${env.ARCHIVIST_PROVIDER}`);
+    try {
+      const { resolveModelConfigFromEnv } = await import("../models/provider.js");
+      const cfg = resolveModelConfigFromEnv({ role: "review" });
+      console.log(`  Provider   : ${cfg.provider}`);
+      console.log(`  Model      : ${cfg.model}`);
+      if (env.ARCHIVIST_REVIEW_MODEL)
+        console.log(`  Review env : ${env.ARCHIVIST_REVIEW_MODEL}`);
+    } catch {
+      console.log(`  Model      : ${env.ARCHIVIST_MODEL} (unresolved)`);
+      if (env.ARCHIVIST_PROVIDER) console.log(`  Provider   : ${env.ARCHIVIST_PROVIDER}`);
+    }
     console.log(`  Repo       : ${repoName}`);
     if (remoteUrl) console.log(`  Remote     : ${remoteUrl}`);
 
@@ -504,6 +565,17 @@ program
     const repoName = identity.repoName;
     const remoteUrl = identity.remoteUrl;
     await memoryStore.getOrCreate(repoId, repoName, remoteUrl);
+    {
+      const mem = await memoryStore.get(repoId);
+      if (mem) {
+        const q = memoryQualityScore(mem);
+        if (q.score < 25) {
+          console.log(
+            `Tip: memory is ${q.label} (${q.score}/100). Add rules or run memory:bootstrap for better reviews.\n`
+          );
+        }
+      }
+    }
 
     const model = createModelFromEnv({
       provider: opts.provider,
