@@ -7,7 +7,7 @@ import type {
   CommentCategory,
 } from "../core/types.js";
 import { memoryStore } from "../memory/store.js";
-import { REVIEW_SYSTEM_PROMPT, buildUserPrompt } from "./prompts.js";
+import { resolveSystemPrompt, buildUserPrompt } from "./prompts.js";
 import { log } from "../core/logger.js";
 import { env } from "../core/config.js";
 import { analyzeDiff } from "./diff-stats.js";
@@ -152,7 +152,7 @@ export class ReviewEngine {
     const raw = await this.model.review({
       diff,
       memoryContext: userPrompt,
-      systemInstructions: REVIEW_SYSTEM_PROMPT,
+      systemInstructions: resolveSystemPrompt(),
     });
 
     const parsed = extractJSON(raw);
@@ -275,7 +275,7 @@ export class ReviewEngine {
             const raw = await this.model.review({
               diff: chunk.text,
               memoryContext: userPrompt,
-              systemInstructions: REVIEW_SYSTEM_PROMPT,
+              systemInstructions: resolveSystemPrompt(),
             });
             const parsed = extractJSON(raw);
             if (!parsed) return { parseFallback: true as const };

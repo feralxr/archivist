@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.1
+
+### Prompt profiles
+- Built-in profiles: strict, balanced, security, mentor, minimal (+ custom file)
+- Detailed strict system prompts per profile
+- `archivist setup` asks which profile to use
+- `prompt:list` / `prompt:set` / `prompt:show`
+- `review --profile <id>`
+- docs/PROMPTS.md
+
 ## 0.4.0
 
 ### Highlights

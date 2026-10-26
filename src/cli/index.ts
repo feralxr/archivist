@@ -552,6 +552,7 @@ program
   .option("--save", "Save last review JSON under .archivist/last-review.json")
   .option("--provider <provider>", "openai | anthropic | openrouter")
   .option("--model <model>", "Any model id for that provider")
+  .option("--profile <profile>", "Prompt profile: strict|balanced|security|mentor|minimal")
   .action(async (opts) => {
     const cwd = workDir();
     if (!hasAnyModelKey()) {
@@ -607,6 +608,9 @@ program
       }
     }
 
+    if (opts.profile) {
+      process.env.ARCHIVIST_PROMPT_PROFILE = String(opts.profile);
+    }
     const model = createModelFromEnv({
       provider: opts.provider,
       model: opts.model,
@@ -781,6 +785,73 @@ program
         console.log("");
       }
     }
+  });
+
+
+program
+  .command("prompt:list")
+  .description("List review prompt profiles")
+  .action(async () => {
+    const { listProfiles, DEFAULT_PROFILE_ID } = await import("../review/profiles.js");
+    const active = (process.env.ARCHIVIST_PROMPT_PROFILE || DEFAULT_PROFILE_ID).toLowerCase();
+    console.log("\nReview prompt profiles\n");
+    for (const p of listProfiles()) {
+      const mark = p.id === active ? " (active)" : "";
+      console.log(`  ${p.id.padEnd(10)} ${p.name}${mark}`);
+      console.log(`             ${p.description}`);
+    }
+    console.log(`
+  custom     Custom — set ARCHIVIST_CUSTOM_PROMPT=/path/to/prompt.txt
+
+Active: ${active}
+Change: archivist prompt:set strict
+        ARCHIVIST_PROMPT_PROFILE=security
+`);
+  });
+
+program
+  .command("prompt:set")
+  .description("Set default review prompt profile in .env")
+  .argument("<profile>", "strict | balanced | security | mentor | minimal | custom")
+  .option("--file <path>", "Custom prompt file (for profile=custom)")
+  .action(async (profile: string, opts: { file?: string }) => {
+    workDir();
+    const id = profile.toLowerCase().trim();
+    const allowed = ["strict", "balanced", "security", "mentor", "minimal", "custom"];
+    if (!allowed.includes(id)) {
+      console.error(`Unknown profile. Use: ${allowed.join(", ")}`);
+      process.exit(1);
+    }
+    if (id === "custom" && !opts.file && !process.env.ARCHIVIST_CUSTOM_PROMPT) {
+      console.error("custom requires --file <path> or ARCHIVIST_CUSTOM_PROMPT");
+      process.exit(1);
+    }
+    const envPath = ".env";
+    let content = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+    const setKey = (text: string, key: string, value: string) => {
+      const re = new RegExp(`^${key}=.*$`, "m");
+      if (re.test(text)) return text.replace(re, `${key}=${value}`);
+      return text.trimEnd() + `\n${key}=${value}\n`;
+    };
+    content = setKey(content || "", "ARCHIVIST_PROMPT_PROFILE", id);
+    if (opts.file) content = setKey(content, "ARCHIVIST_CUSTOM_PROMPT", opts.file);
+    writeFileSync(envPath, content.endsWith("\n") ? content : content + "\n", "utf-8");
+    console.log(`✓ Prompt profile: ${id}`);
+    if (opts.file) console.log(`  Custom file: ${opts.file}`);
+    console.log(`  Wrote ${envPath}`);
+  });
+
+program
+  .command("prompt:show")
+  .description("Show active system prompt (truncated)")
+  .action(async () => {
+    const { resolveSystemPrompt } = await import("../review/prompts.js");
+    const { getProfile, DEFAULT_PROFILE_ID } = await import("../review/profiles.js");
+    const id = process.env.ARCHIVIST_PROMPT_PROFILE || DEFAULT_PROFILE_ID;
+    const prompt = resolveSystemPrompt();
+    console.log(`Profile: ${id}`);
+    console.log(`Length:  ${prompt.length} chars\n`);
+    console.log(prompt.slice(0, 2000) + (prompt.length > 2000 ? "\n\n…[truncated]" : ""));
   });
 
 program

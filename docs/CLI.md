@@ -35,6 +35,17 @@ archivist doctor
 
 Short config + memory summary for the current repo identity.
 
+### `archivist prompt:list` / `prompt:set` / `prompt:show`
+
+```bash
+archivist prompt:list
+archivist prompt:set strict
+archivist prompt:set custom --file ./my-prompt.txt
+archivist prompt:show
+```
+
+See [PROMPTS.md](./PROMPTS.md).
+
 ### `archivist models`
 
 Shows the active provider and model id resolved from env.

@@ -1,77 +1,79 @@
 /**
- * Review prompts — signal-first, memory-strict, structured output.
- * Tuned for fewer nits and stronger memory grounding.
+ * Prompt resolution — profiles + user prompt builder.
  */
+import { readFileSync, existsSync } from "node:fs";
+import {
+  getProfile,
+  DEFAULT_PROFILE_ID,
+  type PromptProfileId,
+} from "./profiles.js";
+import { log } from "../core/logger.js";
 
-export const REVIEW_SYSTEM_PROMPT = `You are Archivist, a senior staff engineer reviewing a change against THIS repository's project memory.
+/** @deprecated Use resolveSystemPrompt() — kept for callers expecting a constant */
+export const REVIEW_SYSTEM_PROMPT = getProfile("balanced").systemPrompt;
 
-Your job is high-signal review: catch real defects and memory violations. Do not dilute the review with style nits the formatter would fix.
+/**
+ * Resolve the active system prompt from env / profile / custom file.
+ *
+ * Env:
+ *   ARCHIVIST_PROMPT_PROFILE=strict|balanced|security|mentor|minimal|custom
+ *   ARCHIVIST_CUSTOM_PROMPT=/path/to/prompt.txt   (required if profile=custom)
+ */
+export function resolveSystemPrompt(overrides?: {
+  profile?: string;
+  customPath?: string;
+}): string {
+  const profileId = (
+    overrides?.profile ||
+    process.env.ARCHIVIST_PROMPT_PROFILE ||
+    DEFAULT_PROFILE_ID
+  )
+    .toLowerCase()
+    .trim() as PromptProfileId;
 
-═══════════════════════════════════════════════════════════════
-A. AUTHORITY ORDER
-═══════════════════════════════════════════════════════════════
-1. Explicit project memory (style, architecture, preferred/discouraged, past feedback)
-2. Clear correctness / security / data-loss risks visible in the diff
-3. Only then: maintainability that has material cost
+  const customPath =
+    overrides?.customPath || process.env.ARCHIVIST_CUSTOM_PROMPT || "";
 
-If memory is empty, say so in the summary and review only for correctness, security, and clarity. Do not invent team conventions.
+  if (profileId === "custom" || customPath) {
+    const path = customPath;
+    if (!path || !existsSync(path)) {
+      log.warn("Custom prompt requested but file missing; falling back to balanced", {
+        path: path || "(empty)",
+      });
+      return getProfile("balanced").systemPrompt;
+    }
+    const text = readFileSync(path, "utf-8").trim();
+    if (text.length < 80) {
+      log.warn("Custom prompt too short; falling back to balanced");
+      return getProfile("balanced").systemPrompt;
+    }
+    // Ensure JSON contract is present
+    if (!text.includes("summary") || !text.includes("comments")) {
+      return text + "\n\n" + JSON_CONTRACT_APPENDIX;
+    }
+    return text;
+  }
 
-═══════════════════════════════════════════════════════════════
-B. MUST FLAG
-═══════════════════════════════════════════════════════════════
-- Logic bugs, broken edge cases, off-by-ones, null/undefined hazards
-- Security: injection, XSS, SSRF, authz gaps, secret leakage, unsafe deserialization
-- Explicit memory violations (style rules, architecture boundaries, discouraged patterns)
-- Public API breaks without acknowledgment
-- Concurrency / resource leaks when evidence is in the diff
-- Tests removed or weakened without replacement when behavior changes
+  return getProfile(profileId).systemPrompt;
+}
 
-═══════════════════════════════════════════════════════════════
-C. MUST NOT FLAG
-═══════════════════════════════════════════════════════════════
-- Formatting, import order, trailing commas, quote style (unless memory forbids it)
-- "Consider adding a comment" with no defect
-- Restating the PR description
-- Praise-only or LGTM-style noise
-- Hypothetical issues with no support in the diff
-- Paths or symbols not present in the diff
-
-═══════════════════════════════════════════════════════════════
-D. COMMENT CRAFT
-═══════════════════════════════════════════════════════════════
-- Max 8 comments. Prefer fewer, higher severity.
-- One issue per comment. Actionable: what to change and why.
-- 1–4 sentences. Reference concrete symbols / conditions from the diff.
-- When driven by memory, put a short citation in "explanation"
-  (e.g. "Project memory: Prefer early returns", "Discouraged: any in public APIs").
-- Severity:
-  error = must fix (bug, security, hard memory / API break)
-  warning = should fix (likely defect or clear memory conflict)
-  suggestion = optional improvement aligned with preferred patterns
-  info = rare; prefer omitting
-
-═══════════════════════════════════════════════════════════════
-E. OUTPUT (strict JSON only)
-═══════════════════════════════════════════════════════════════
-No markdown fences. No prose outside JSON.
-
+const JSON_CONTRACT_APPENDIX = `
+You must return ONLY valid JSON (no markdown fences):
 {
-  "summary": "2–4 sentences: what matters, whether memory applied, residual risk.",
+  "summary": "2-4 sentences",
   "comments": [
     {
-      "path": "relative/path.ts",
-      "line": 42,
-      "body": "Actionable feedback tied to the changed code.",
-      "severity": "error" | "warning" | "suggestion" | "info",
-      "category": "bug" | "security" | "architecture" | "style" | "history" | "refactor" | "performance" | "testing" | "docs" | "other",
-      "explanation": "Memory citation or engineering rationale."
+      "path": "file",
+      "line": 1,
+      "body": "actionable text",
+      "severity": "error|warning|suggestion|info",
+      "category": "bug|security|architecture|style|history|refactor|performance|testing|docs|other",
+      "explanation": "optional rationale"
     }
   ]
 }
-
-Line numbers: NEW file (right side). Only changed or adjacent context lines. Omit line if unsure.
-
-Review as a trusted teammate protecting this codebase — not as a linter or gatekeeping bot.`;
+Max 8 comments. Prefer higher severity.
+`;
 
 const MAX_DIFF_CHARS = 120_000;
 const MAX_PR_BODY = 2_500;
@@ -131,7 +133,7 @@ export function buildUserPrompt(params: {
   parts.push("```");
 
   parts.push(
-    "\nApply project memory strictly. Prefer high-severity findings. Max 8 comments. JSON only."
+    "\nApply project memory strictly under the active profile rules. Max 8 comments. JSON only."
   );
   if (truncated) {
     parts.push("Note: diff was truncated; do not assume unseen hunks are clean.");

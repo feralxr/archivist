@@ -35,6 +35,8 @@ const envSchema = z.object({
   ARCHIVIST_MAX_COMMENTS: z.coerce.number().int().min(1).max(20).default(8),
   ARCHIVIST_CHUNK_CONCURRENCY: z.coerce.number().int().min(1).max(4).default(2),
   ARCHIVIST_SKIP_DOCS_ONLY: z.string().optional(),
+  ARCHIVIST_PROMPT_PROFILE: z.string().optional(),
+  ARCHIVIST_CUSTOM_PROMPT: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -163,6 +163,37 @@ Press Enter to keep defaults / skip.
     if (provider) values.ARCHIVIST_PROVIDER = provider;
     if (model) values.ARCHIVIST_MODEL = model;
 
+    console.log(`
+Review prompt profile (how strict the AI reviewer is):
+  1) balanced  — high signal, most teams (default)
+  2) strict    — merge-gating, memory is law
+  3) security  — AppSec-first
+  4) mentor    — teaches why
+  5) minimal   — only important issues
+  6) custom    — path to your own system prompt file
+`);
+    const profChoice = await ask(rl, "Profile", { default: "1" });
+    const profileMap: Record<string, string> = {
+      "1": "balanced",
+      "2": "strict",
+      "3": "security",
+      "4": "mentor",
+      "5": "minimal",
+      "6": "custom",
+      balanced: "balanced",
+      strict: "strict",
+      security: "security",
+      mentor: "mentor",
+      minimal: "minimal",
+      custom: "custom",
+    };
+    const profile = profileMap[profChoice.toLowerCase()] || "balanced";
+    values.ARCHIVIST_PROMPT_PROFILE = profile;
+    if (profile === "custom") {
+      const customPath = await ask(rl, "Path to custom system prompt .txt");
+      if (customPath) values.ARCHIVIST_CUSTOM_PROMPT = customPath;
+    }
+
     const seed = await ask(rl, "Seed starter style rules on init? (y/N)", {
       default: "y",
     });
