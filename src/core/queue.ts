@@ -6,7 +6,9 @@ export class ConcurrencyQueue {
   private running = 0;
   private queue: Array<() => void> = [];
 
-  constructor(private concurrency: number = 2) {}
+  constructor(private concurrency: number = 2) {
+    if (concurrency < 1) this.concurrency = 1;
+  }
 
   async run<T>(fn: () => Promise<T>): Promise<T> {
     if (this.running >= this.concurrency) {
@@ -24,8 +26,18 @@ export class ConcurrencyQueue {
   }
 
   get stats() {
-    return { running: this.running, queued: this.queue.length };
+    return {
+      running: this.running,
+      queued: this.queue.length,
+      concurrency: this.concurrency,
+    };
   }
 }
 
-export const reviewQueue = new ConcurrencyQueue(2);
+function defaultConcurrency(): number {
+  const n = Number(process.env.ARCHIVIST_REVIEW_CONCURRENCY || "2");
+  if (!Number.isFinite(n) || n < 1) return 2;
+  return Math.min(8, Math.floor(n));
+}
+
+export const reviewQueue = new ConcurrencyQueue(defaultConcurrency());

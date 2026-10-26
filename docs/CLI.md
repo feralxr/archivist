@@ -36,7 +36,8 @@ App-only fields are soft warnings for CLI use. Non-zero exit on hard failures.
 archivist doctor
 ```
 
-### `archivist status`
+### `archivist status
+archivist status --json`
 
 Short config + memory summary for the current repo identity.
 

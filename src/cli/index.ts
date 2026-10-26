@@ -254,6 +254,43 @@ program
   .action(async (opts: { json?: boolean }) => {
     workDir();
     const { repoId, repoName, remoteUrl } = resolveLocalRepoIdentity();
+
+    if (opts.json) {
+      let provider: string | null = null;
+      let modelId: string | null = null;
+      try {
+        const { resolveModelConfigFromEnv } = await import("../models/provider.js");
+        const cfg = resolveModelConfigFromEnv({ role: "review" });
+        provider = cfg.provider;
+        modelId = cfg.model;
+      } catch { /* ignore */ }
+      const stats = await memoryStore.stats(repoId);
+      const mem = await memoryStore.get(repoId);
+      const quality = mem ? memoryQualityScore(mem) : null;
+      console.log(
+        JSON.stringify(
+          {
+            repoId,
+            repoName,
+            remoteUrl: remoteUrl || null,
+            keys: {
+              openrouter: hasOpenRouter(),
+              anthropic: hasAnthropic(),
+              openai: hasOpenAI(),
+            },
+            provider,
+            model: modelId,
+            githubApp: hasGitHubApp(),
+            memory: stats,
+            quality,
+          },
+          null,
+          2
+        )
+      );
+      return;
+    }
+
     console.log("\nConfiguration");
     console.log(`  OpenRouter : ${hasOpenRouter() ? "yes" : "no"}`);
     console.log(`  Anthropic  : ${hasAnthropic() ? "yes" : "no"}`);

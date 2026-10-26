@@ -76,6 +76,7 @@ async function main() {
   const { listProfiles, getProfile } = await import("../src/review/profiles.js");
   const { analyzeDiff } = await import("../src/review/diff-stats.js");
   const { chunkDiff } = await import("../src/review/chunk.js");
+  const { extractChangedLines, extractPathsFromDiff } = await import("../src/review/engine.js");
   const { githubRepoId } = await import("../src/memory/repo-id.js");
   const { cosine } = await import("../src/memory/embeddings.js");
   const { metrics } = await import("../src/core/metrics.js");
@@ -346,6 +347,14 @@ async function main() {
       githubRepoId("org/repo", "https://github.com/org/repo") === "github.com/org/repo",
       "from html url"
     );
+  });
+
+  test("review", "extractChangedLines maps new lines", () => {
+    const diff = `diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n@@ -1,3 +1,4 @@\n line1\n-old\n+new\n line3\n`;
+    const map = extractChangedLines(diff);
+    const lines = map.get("a.ts");
+    assert(lines && lines.size >= 1, "changed lines present");
+    assert(extractPathsFromDiff(diff).has("a.ts"), "path extracted");
   });
 
   test("review", "chunkDiff splits multi-file", () => {

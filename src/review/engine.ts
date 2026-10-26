@@ -449,7 +449,7 @@ function pathInDiff(path: string, changed: Set<string>): boolean {
 
 
 /** Map path → set of new-file line numbers touched by the diff. */
-function extractChangedLines(diff: string): Map<string, Set<number>> {
+export function extractChangedLines(diff: string): Map<string, Set<number>> {
   const map = new Map<string, Set<number>>();
   let current: string | null = null;
   let newLine = 0;
@@ -490,7 +490,7 @@ function extractChangedLines(diff: string): Map<string, Set<number>> {
   return map;
 }
 
-function extractPathsFromDiff(diff: string): Set<string> {
+export function extractPathsFromDiff(diff: string): Set<string> {
   const paths = new Set<string>();
   for (const line of diff.split("\n")) {
     if (line.startsWith("diff --git ")) {

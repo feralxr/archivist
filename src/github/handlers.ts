@@ -11,6 +11,24 @@ import { githubRepoId } from "../memory/repo-id.js";
 import { log } from "../core/logger.js";
 import { reviewQueue } from "../core/queue.js";
 import { withRetry } from "../core/retry.js";
+
+async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      p,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${label} timed out after ${ms}ms`)),
+          ms
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 import { metrics } from "../core/metrics.js";
 
 type PREvent = EmitterWebhookEvent<"pull_request">;
@@ -182,27 +200,32 @@ export async function handlePullRequestEvent(
       const engine = new ReviewEngine(model);
 
       // Retry only the model call — avoid duplicate PR reviews on partial failure
-      const result = await withRetry(
-        () =>
-          engine.review({
-            repoId,
-            diff: diffText,
-            title: pr.title,
-            body: pr.body || undefined,
-          }),
-        {
-          retries: 3,
-          minDelayMs: 1000,
-          maxDelayMs: 15_000,
-          onRetry: (err, attempt) => {
-            log.warn("Model review retry", {
-              repo: repoFullName,
-              pr: pr.number,
-              attempt,
-              error: err instanceof Error ? err.message : String(err),
-            });
-          },
-        }
+      const reviewTimeoutMs = Number(process.env.ARCHIVIST_REVIEW_TIMEOUT_MS || "180000");
+      const result = await withTimeout(
+        withRetry(
+          () =>
+            engine.review({
+              repoId,
+              diff: diffText,
+              title: pr.title,
+              body: pr.body || undefined,
+            }),
+          {
+            retries: 3,
+            minDelayMs: 1000,
+            maxDelayMs: 15_000,
+            onRetry: (err, attempt) => {
+              log.warn("Model review retry", {
+                repo: repoFullName,
+                pr: pr.number,
+                attempt,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            },
+          }
+        ),
+        reviewTimeoutMs,
+        "Review"
       );
 
       log.info("Review complete", {

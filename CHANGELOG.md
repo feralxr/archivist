@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.8
+
+### Hardening (depth)
+- Server: version/uptime on /health, timeouts, JSON 404/500
+- Configurable review queue concurrency + review timeout on App path
+- Memory search type/confidence boosts
+- `status --json` for automation
+- Tests for extractChangedLines
+
 ## 0.4.7
 
 ### Depth

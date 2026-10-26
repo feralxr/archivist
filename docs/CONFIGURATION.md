@@ -82,3 +82,6 @@ Scopes for a PAT used only for bootstrap: public `repo` read is enough for publi
 - Rotate any token that was ever pasted into chat, screenshots, or git remotes.
 
 See [SECURITY.md](./SECURITY.md).
+
+| `ARCHIVIST_REVIEW_CONCURRENCY` | `2` | Max concurrent PR reviews in the App server |
+| `ARCHIVIST_REVIEW_TIMEOUT_MS` | `180000` | Abort a single review after this many ms |

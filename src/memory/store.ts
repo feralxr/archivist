@@ -219,6 +219,14 @@ export class MemoryStore {
     const queryEmbedding = await embed(query);
     const results: MemorySearchResult[] = [];
 
+    const typeBoost: Record<string, number> = {
+      style: 1.15,
+      architecture: 1.2,
+      pattern: 1.1,
+      feedback: 1.05,
+      snippet: 0.95,
+    };
+
     const push = (
       content: string,
       type: MemorySearchResult["type"],
@@ -231,10 +239,18 @@ export class MemoryStore {
       } else {
         score = lexicalScore(content, query);
       }
+      score *= typeBoost[type] ?? 1;
+      // Prefer higher-confidence style rules when present in content path — applied below for rules
       if (score > 0.15) results.push({ content, type, score, id });
     };
 
-    for (const r of memory.styleRules) push(r.rule, "style", r.embedding, r.id);
+    for (const r of memory.styleRules) {
+      const before = results.length;
+      push(r.rule, "style", r.embedding, r.id);
+      if (results.length > before && typeof r.confidence === "number") {
+        results[results.length - 1].score *= 0.9 + 0.2 * r.confidence;
+      }
+    }
     for (const n of memory.architectureNotes)
       push(n.note, "architecture", n.embedding, n.id);
     for (const p of memory.patterns) {
