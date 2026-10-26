@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.6
+
+### Depth
+- Anthropic: JSON-only reinforcement + fence strip + lower temperature
+- Doctor: prompt profile, data dir, node, max comments, min confidence
+- Eval: pass rate, latency avg/p95, severity distribution in last-results.json
+- extractJSON: tolerate trailing commas
+
 ## 0.4.5
 
 ### Hardening

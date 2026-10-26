@@ -533,6 +533,13 @@ function extractJSON(text: string): unknown {
   } catch {
     /* continue */
   }
+  // Trailing commas (common model slip)
+  try {
+    const fixed = trimmed.replace(/,\s*([}\]])/g, "$1");
+    return JSON.parse(fixed);
+  } catch {
+    /* continue */
+  }
   // Fenced block
   const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fence) {

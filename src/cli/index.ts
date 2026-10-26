@@ -172,6 +172,40 @@ program
       });
     }
 
+    const profile = process.env.ARCHIVIST_PROMPT_PROFILE || env.ARCHIVIST_PROMPT_PROFILE || "balanced";
+    checks.push({
+      name: "Prompt profile",
+      ok: true,
+      detail: profile + (env.ARCHIVIST_CUSTOM_PROMPT ? ` + custom:${env.ARCHIVIST_CUSTOM_PROMPT}` : ""),
+    });
+
+    const dataDir = process.env.ARCHIVIST_DATA_DIR || env.ARCHIVIST_DATA_DIR || ".archivist (cwd)";
+    checks.push({
+      name: "Data dir",
+      ok: true,
+      detail: String(dataDir),
+    });
+
+    checks.push({
+      name: "Node",
+      ok: true,
+      detail: process.version,
+    });
+
+    if (env.ARCHIVIST_MIN_CONFIDENCE) {
+      checks.push({
+        name: "Min confidence",
+        ok: true,
+        detail: String(env.ARCHIVIST_MIN_CONFIDENCE),
+      });
+    }
+
+    checks.push({
+      name: "Max comments",
+      ok: true,
+      detail: String(env.ARCHIVIST_MAX_COMMENTS ?? 8),
+    });
+
     for (const c of checks) {
       console.log(`  ${c.ok ? "✓" : "✗"}  ${c.name.padEnd(22)} ${c.detail}`);
     }

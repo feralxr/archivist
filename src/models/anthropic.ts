@@ -27,6 +27,11 @@ export class AnthropicModel implements ReviewModel {
     memoryContext: string;
     systemInstructions: string;
   }): Promise<string> {
+    // Reinforce JSON-only — Anthropic has no response_format flag like OpenAI
+    const system =
+      params.systemInstructions.trim() +
+      "\n\nCRITICAL: Reply with a single JSON object only. No markdown fences, no prose before or after.";
+
     const content = await withRetry(
       async () => {
         const res = await fetch(`${this.baseUrl}/v1/messages`, {
@@ -39,8 +44,8 @@ export class AnthropicModel implements ReviewModel {
           body: JSON.stringify({
             model: this.model,
             max_tokens: 8192,
-            temperature: 0.15,
-            system: params.systemInstructions,
+            temperature: 0.1,
+            system,
             messages: [
               {
                 role: "user",
@@ -63,13 +68,17 @@ export class AnthropicModel implements ReviewModel {
           content?: Array<{ type: string; text?: string }>;
         };
 
-        const text = data.content
+        let text = data.content
           ?.filter((b) => b.type === "text" && b.text)
           .map((b) => b.text)
           .join("\n")
           .trim();
 
         if (!text) throw new Error("Anthropic returned empty response");
+
+        // Strip accidental fences
+        text = stripJsonFences(text);
+
         return text;
       },
       {
@@ -86,4 +95,11 @@ export class AnthropicModel implements ReviewModel {
 
     return content;
   }
+}
+
+function stripJsonFences(text: string): string {
+  const trimmed = text.trim();
+  const fence = trimmed.match(/^```(?:json)?\s*([\s\S]*?)```$/i);
+  if (fence) return fence[1].trim();
+  return trimmed;
 }

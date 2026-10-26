@@ -57,7 +57,7 @@ async function main() {
     readFileSync(join(root, "manifest.json"), "utf-8")
   ) as { cases: Case[] };
 
-  const model = createModelFromEnv();
+  const model = createModelFromEnv({ role: "review" });
   const engine = new ReviewEngine(model);
 
   console.log("╔══════════════════════════════════════════════════════╗");
@@ -181,22 +181,39 @@ async function main() {
     });
   }
 
+  // Aggregate metrics
+  const allComments = results.flatMap((r) => (r.comments as any[]) || []);
+  const severityCounts: Record<string, number> = {};
+  for (const c of allComments) {
+    const s = String(c.severity || "unknown");
+    severityCounts[s] = (severityCounts[s] || 0) + 1;
+  }
+  const times = results.map((r) => Number(r.ms) || 0).filter((n) => n > 0);
+  const avgMs = times.length
+    ? Math.round(times.reduce((a, b) => a + b, 0) / times.length)
+    : 0;
+  const p95Ms = times.length
+    ? times.sort((a, b) => a - b)[Math.min(times.length - 1, Math.floor(times.length * 0.95))]
+    : 0;
+
   const out = join(root, "last-results.json");
-  writeFileSync(
-    out,
-    JSON.stringify(
-      {
-        model: `${model.name}/${model.model}`,
-        at: new Date().toISOString(),
-        passed,
-        failed,
-        results,
-      },
-      null,
-      2
-    ),
-    "utf-8"
-  );
+  const report = {
+    model: `${model.name}/${model.model}`,
+    profile: process.env.ARCHIVIST_PROMPT_PROFILE || "balanced",
+    at: new Date().toISOString(),
+    passed,
+    failed,
+    total: passed + failed,
+    passRate: passed + failed ? passed / (passed + failed) : 0,
+    metrics: {
+      avgLatencyMs: avgMs,
+      p95LatencyMs: p95Ms,
+      totalComments: allComments.length,
+      severityCounts,
+    },
+    results,
+  };
+  writeFileSync(out, JSON.stringify(report, null, 2), "utf-8");
 
   try {
     rmSync(dataDir, { recursive: true, force: true });
@@ -207,6 +224,9 @@ async function main() {
   console.log("\n────────────────────────────────────────────────────");
   console.log(`Passed : ${passed}`);
   console.log(`Failed : ${failed}`);
+  console.log(`Pass % : ${report.passRate ? Math.round(report.passRate * 100) : 0}%`);
+  console.log(`Avg ms : ${avgMs}  ·  p95: ${p95Ms}`);
+  console.log(`Comments total: ${allComments.length}  ·  severities: ${JSON.stringify(severityCounts)}`);
   console.log(`Wrote  : ${out}`);
   console.log("────────────────────────────────────────────────────\n");
 
