@@ -105,8 +105,12 @@ function buildReviewBody(result: ReviewResult): string {
   return lines.join("\n");
 }
 
+function sanitizeBody(s: string): string {
+  return s.replace(/\0/g, "").replace(/[\u2028\u2029]/g, " ").slice(0, 65000);
+}
+
 function toInline(c: ReviewComment) {
-  let body = c.body.trim();
+  let body = sanitizeBody(c.body.trim());
   if (c.explanation) {
     body += `\n\n> **Why:** ${c.explanation}`;
   }

@@ -41,6 +41,7 @@ export class OpenAIModel implements ReviewModel {
           ],
           temperature: 0.15,
           max_tokens: 8192,
+          response_format: { type: "json_object" },
         });
 
         const text = response.choices[0]?.message?.content?.trim();
@@ -48,7 +49,7 @@ export class OpenAIModel implements ReviewModel {
         return text;
       },
       {
-        retries: 3,
+        retries: 2,
         onRetry: (err, attempt) => {
           log.warn("OpenAI call failed, retrying", {
             attempt,

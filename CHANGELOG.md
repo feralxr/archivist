@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.5
+
+### Hardening
+- JSON `response_format` for OpenAI + OpenRouter reviews
+- Diff line-map validation (±3) before inline comments
+- `ARCHIVIST_MIN_CONFIDENCE` filter
+- Consolidate merges duplicate style rules + patterns
+- Comment body sanitization; embedding failure logs
+- Fewer nested model retries (outer handlers still retry)
+
 ## 0.4.4
 
 ### Depth / finish

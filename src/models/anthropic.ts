@@ -73,7 +73,7 @@ export class AnthropicModel implements ReviewModel {
         return text;
       },
       {
-        retries: 3,
+        retries: 2,
         onRetry: (err, attempt) => {
           log.warn("Anthropic call failed, retrying", {
             attempt,

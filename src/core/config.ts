@@ -38,6 +38,7 @@ const envSchema = z.object({
   ARCHIVIST_PROMPT_PROFILE: z.string().optional(),
   ARCHIVIST_CUSTOM_PROMPT: z.string().optional(),
   ARCHIVIST_REQUEST_CHANGES: z.string().optional(),
+  ARCHIVIST_MIN_CONFIDENCE: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

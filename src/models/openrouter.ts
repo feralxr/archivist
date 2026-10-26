@@ -44,6 +44,7 @@ export class OpenRouterModel implements ReviewModel {
           ],
           temperature: 0.15,
           max_tokens: 8192,
+          response_format: { type: "json_object" },
         });
 
         const message = response.choices[0]?.message as any;
@@ -66,7 +67,7 @@ export class OpenRouterModel implements ReviewModel {
         return text;
       },
       {
-        retries: 3,
+        retries: 2,
         onRetry: (err, attempt) => {
           log.warn("Model call failed, retrying", {
             attempt,

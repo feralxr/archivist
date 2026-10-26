@@ -207,10 +207,12 @@ export class ReviewEngine {
     }
 
     const changedPaths = extractPathsFromDiff(diff);
+    const changedLines = extractChangedLines(diff);
     const comments = postProcessComments(
       validated.data.comments,
       changedPaths,
-      memoryContext
+      memoryContext,
+      changedLines
     );
 
     const summary =
@@ -285,7 +287,8 @@ export class ReviewEngine {
             const comments = postProcessComments(
               validated.data.comments,
               paths,
-              memoryContext
+              memoryContext,
+              extractChangedLines(chunk.text)
             );
             return {
               summary: validated.data.summary,
@@ -356,7 +359,8 @@ export class ReviewEngine {
 function postProcessComments(
   raw: z.infer<typeof commentSchema>[],
   changedPaths: Set<string>,
-  memoryContext: string
+  memoryContext: string,
+  changedLines?: Map<string, Set<number>>
 ): ReviewComment[] {
   const seen = new Set<string>();
   const out: ReviewComment[] = [];
@@ -379,9 +383,20 @@ function postProcessComments(
       else continue;
     }
 
+    // Drop or clear line if not in changed hunk lines for that path
+    let line = c.line;
+    if (line && changedLines && changedLines.size > 0) {
+      const lines = changedLines.get(path);
+      if (lines && lines.size > 0 && !lines.has(line)) {
+        // allow ±3 context
+        const near = [...lines].some((n) => Math.abs(n - line!) <= 3);
+        if (!near) line = undefined;
+      }
+    }
+
     const severity = c.severity as CommentSeverity;
     const category = c.category as CommentCategory;
-    const key = `${path}:${c.line ?? ""}:${body.slice(0, 80).toLowerCase()}`;
+    const key = `${path}:${line ?? ""}:${body.slice(0, 80).toLowerCase()}`;
     if (seen.has(key)) continue;
     seen.add(key);
 
@@ -395,13 +410,13 @@ function postProcessComments(
     if (severity === "error") confidence += 0.15;
     if (explanation && /project|memory|style|architecture|prefer|avoid/i.test(explanation))
       confidence += 0.15;
-    if (c.line) confidence += 0.05;
+    if (line) confidence += 0.05;
     if (category === "bug" || category === "security") confidence += 0.1;
     confidence = Math.min(0.95, confidence);
 
     out.push({
       path,
-      line: c.line,
+      line,
       body,
       severity,
       category,
@@ -418,7 +433,10 @@ function postProcessComments(
     return (b.confidence ?? 0) - (a.confidence ?? 0);
   });
 
-  return out.slice(0, maxComments());
+  const minConf = Number(process.env.ARCHIVIST_MIN_CONFIDENCE || "0");
+  const filtered =
+    minConf > 0 ? out.filter((c) => (c.confidence ?? 1) >= minConf) : out;
+  return filtered.slice(0, maxComments());
 }
 
 function pathInDiff(path: string, changed: Set<string>): boolean {
@@ -427,6 +445,49 @@ function pathInDiff(path: string, changed: Set<string>): boolean {
     if (p.endsWith("/" + path) || path.endsWith("/" + p)) return true;
   }
   return false;
+}
+
+
+/** Map path → set of new-file line numbers touched by the diff. */
+function extractChangedLines(diff: string): Map<string, Set<number>> {
+  const map = new Map<string, Set<number>>();
+  let current: string | null = null;
+  let newLine = 0;
+
+  for (const raw of diff.split("\n")) {
+    const line = raw;
+    if (line.startsWith("diff --git ")) {
+      const m = line.match(/diff --git a\/.+ b\/(.+)/);
+      current = m ? m[1] : null;
+      if (current && current !== "/dev/null" && !map.has(current)) {
+        map.set(current, new Set());
+      }
+      continue;
+    }
+    if (line.startsWith("+++ ")) {
+      const p = line.slice(4).trim().replace(/^b\//, "");
+      if (p && p !== "/dev/null") {
+        current = p;
+        if (!map.has(current)) map.set(current, new Set());
+      }
+      continue;
+    }
+    const hunk = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (hunk) {
+      newLine = parseInt(hunk[1], 10);
+      continue;
+    }
+    if (!current || !map.has(current)) continue;
+    if (line.startsWith("+") && !line.startsWith("+++")) {
+      map.get(current)!.add(newLine);
+      newLine++;
+    } else if (line.startsWith("-") && !line.startsWith("---")) {
+      // deleted line — does not advance new file line
+    } else if (line.startsWith(" ") || line === "") {
+      newLine++;
+    }
+  }
+  return map;
 }
 
 function extractPathsFromDiff(diff: string): Set<string> {

@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { log } from "../core/logger.js";
 import { env, hasOpenRouter, hasOpenAI } from "../core/config.js";
 
 /**
@@ -54,8 +55,11 @@ export async function embed(text: string): Promise<number[] | null> {
       input: text.slice(0, 8000),
     });
     return res.data[0]?.embedding ?? null;
-  } catch {
+  } catch (err) {
     // Fail soft — lexical search still works
+    log.warn("Embedding failed; using lexical search only", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }

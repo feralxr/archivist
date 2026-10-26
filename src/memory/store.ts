@@ -449,24 +449,51 @@ export class MemoryStore {
     const feedback = [...memory.historicalFeedback].sort(
       (a, b) => b.frequency - a.frequency
     );
-    const kept: HistoricalFeedback[] = [];
-
+    const keptFb: HistoricalFeedback[] = [];
     for (const item of feedback) {
-      const twin = kept.find(
-        (k) => similarity(k.summary, item.summary) >= 0.72
-      );
+      const twin = keptFb.find((k) => similarity(k.summary, item.summary) >= 0.72);
       if (twin) {
         twin.frequency += item.frequency;
         if (item.lastSeen > twin.lastSeen) twin.lastSeen = item.lastSeen;
         merged++;
       } else {
-        kept.push({ ...item });
+        keptFb.push({ ...item });
       }
     }
-    memory.historicalFeedback = kept;
+    memory.historicalFeedback = keptFb;
+
+    // Merge near-duplicate style rules (keep higher confidence)
+    const keptRules: StyleRule[] = [];
+    for (const rule of [...memory.styleRules].sort(
+      (a, b) => (b.confidence ?? 0) - (a.confidence ?? 0)
+    )) {
+      const twin = keptRules.find((k) => similarity(k.rule, rule.rule) >= 0.8);
+      if (twin) {
+        twin.confidence = Math.max(twin.confidence ?? 0, rule.confidence ?? 0);
+        merged++;
+      } else {
+        keptRules.push({ ...rule });
+      }
+    }
+    memory.styleRules = keptRules;
+
+    // Merge near-duplicate patterns
+    const keptPat: Pattern[] = [];
+    for (const pat of memory.patterns) {
+      const twin = keptPat.find(
+        (k) =>
+          k.preferred === pat.preferred &&
+          similarity(k.description, pat.description) >= 0.8
+      );
+      if (twin) {
+        merged++;
+      } else {
+        keptPat.push({ ...pat });
+      }
+    }
+    memory.patterns = keptPat;
 
     const before = memory.rawSnippets.length;
-    // Prefer longer, more recent snippets
     memory.rawSnippets = memory.rawSnippets
       .filter((s) => s.text.trim().length >= 30)
       .slice(0, 80);
