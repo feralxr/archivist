@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.7
+
+### Depth
+- `doctor --json` for CI health gates
+- Eval cases: secret-leak, null-hazard (8 golden cases)
+
 ## 0.4.6
 
 ### Depth

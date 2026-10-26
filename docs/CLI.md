@@ -24,6 +24,11 @@ Prints setup instructions (model keys, GitHub App overview).
 
 ### `archivist doctor`
 
+```bash
+archivist doctor
+archivist doctor --json   # CI gate: exit 1 on hard failures
+```
+
 Health check: keys, **resolved** review provider/model, GitHub App env, memory quality.
 App-only fields are soft warnings for CLI use. Non-zero exit on hard failures.
 

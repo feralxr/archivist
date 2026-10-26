@@ -107,6 +107,46 @@
         ],
         "summaryNotEmpty": true
       }
+    },
+    {
+      "id": "secret-leak",
+      "diff": "secret-leak.diff",
+      "title": "Debug stripe in config",
+      "memory": {
+        "styleRules": [
+          "Never commit secrets or API keys"
+        ],
+        "discouraged": [
+          "Hardcoded credentials"
+        ]
+      },
+      "expect": {
+        "minComments": 1,
+        "mustHaveSeverity": [
+          "error",
+          "warning"
+        ],
+        "summaryNotEmpty": true
+      }
+    },
+    {
+      "id": "null-hazard",
+      "diff": "null-hazard.diff",
+      "title": "Simplify displayName",
+      "memory": {
+        "styleRules": [
+          "Handle optional fields safely"
+        ]
+      },
+      "expect": {
+        "minComments": 1,
+        "mustHaveSeverity": [
+          "error",
+          "warning",
+          "suggestion"
+        ],
+        "summaryNotEmpty": true
+      }
     }
   ]
 }

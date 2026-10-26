@@ -1,6 +1,6 @@
 # Project status — finish current surface
 
-Last updated: 0.4.5
+Last updated: 0.4.7
 
 ## Checklist
 
@@ -12,8 +12,8 @@ Last updated: 0.4.5
 | Prompt profiles | Done |
 | Interactive setup | Done |
 | Atomic memory writes | Done |
-| Line-map + JSON mode hardening | Done (0.4.5) |
-| Consolidate dedupe rules/patterns | Done (0.4.5) |
+| Line-map + JSON mode hardening | Done (0.4.7) |
+| Consolidate dedupe rules/patterns | Done (0.4.7) |
 | Core unit tests | Run locally: `npm run test:core` |
 | Live eval | Run locally: `npm run eval` / `npm test` |
 | npm publish `@feralxr/archivist` | Operator: `docs/NPM.md` |

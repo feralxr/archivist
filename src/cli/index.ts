@@ -68,9 +68,10 @@ Status: OpenRouter ${hasOpenRouter() ? "✓" : "✗"}  Anthropic ${hasAnthropic(
 program
   .command("doctor")
   .description("Check configuration health")
-  .action(async () => {
+  .option("--json", "Machine-readable JSON (CI-friendly)")
+  .action(async (opts: { json?: boolean }) => {
     workDir();
-    console.log("\nArchivist Doctor\n");
+    if (!opts.json) console.log("\nArchivist Doctor\n");
     const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
 
     checks.push({
@@ -206,17 +207,33 @@ program
       detail: String(env.ARCHIVIST_MAX_COMMENTS ?? 8),
     });
 
-    for (const c of checks) {
-      console.log(`  ${c.ok ? "✓" : "✗"}  ${c.name.padEnd(22)} ${c.detail}`);
-    }
-
     const failed = checks.filter((c) => !c.ok).length;
-    // Keys for App-only are soft warnings if CLI-only
     const hardFailed = checks.filter(
       (c) =>
         !c.ok &&
         !["GitHub App ID", "GitHub Private Key", "Webhook secret"].includes(c.name)
     ).length;
+
+    if (opts.json) {
+      console.log(
+        JSON.stringify(
+          {
+            ok: hardFailed === 0,
+            hardFailed,
+            softFailed: failed - hardFailed,
+            checks,
+          },
+          null,
+          2
+        )
+      );
+      if (hardFailed > 0) process.exitCode = 1;
+      return;
+    }
+
+    for (const c of checks) {
+      console.log(`  ${c.ok ? "✓" : "✗"}  ${c.name.padEnd(22)} ${c.detail}`);
+    }
 
     if (hardFailed === 0) {
       console.log(
@@ -233,7 +250,8 @@ program
 program
   .command("status")
   .description("Config + memory summary")
-  .action(async () => {
+  .option("--json", "Machine-readable JSON")
+  .action(async (opts: { json?: boolean }) => {
     workDir();
     const { repoId, repoName, remoteUrl } = resolveLocalRepoIdentity();
     console.log("\nConfiguration");
