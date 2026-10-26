@@ -128,6 +128,14 @@ Merges near-duplicate historical feedback and trims low-value snippets.
 
 Full learning pass: consolidate → promote frequent feedback to rules → infer rules from snippets.
 
+### `archivist memory:migrate`
+
+Rewrite legacy memory files to canonical `github.com/owner/repo` ids (needed after 0.4.2 App/CLI alignment). Merges when both old and new exist.
+
+```bash
+archivist memory:migrate
+```
+
 ### `archivist memory:quality`
 
 Scores memory 0–100 (`empty` → `thin` → `useful` → `strong`) and prints tips.

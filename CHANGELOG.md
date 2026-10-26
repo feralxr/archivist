@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.3
+
+### Finish current surface
+- `memory:migrate` — rewrite/merge legacy numeric or bare ids → `github.com/owner/repo`
+- `MemoryStore.listAll` for data-dir inventory
+
 ## 0.4.2
 
 ### Fixes (code review)

@@ -997,6 +997,31 @@ program
     }
   });
 
+
+program
+  .command("memory:migrate")
+  .description("Migrate legacy memory ids to github.com/owner/repo (post-0.4.2)")
+  .action(async () => {
+    workDir();
+    const result = await memoryStore.migrateRepoIds();
+    console.log("\nMemory id migration\n");
+    if (result.migrated.length) {
+      console.log("Migrated:");
+      for (const m of result.migrated) console.log(`  • ${m}`);
+    }
+    if (result.merged.length) {
+      console.log("Merged into existing:");
+      for (const m of result.merged) console.log(`  • ${m}`);
+    }
+    if (result.skipped.length) {
+      console.log(`Skipped (already ok or unresolvable): ${result.skipped.length}`);
+    }
+    if (!result.migrated.length && !result.merged.length) {
+      console.log("Nothing to migrate.");
+    }
+    console.log("");
+  });
+
 program
   .command("memory:quality")
   .description("Score how strong project memory is")

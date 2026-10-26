@@ -500,6 +500,123 @@ export class MemoryStore {
     };
   }
 
+
+  /** List all memory files under the data dir. */
+  async listAll(): Promise<ProjectMemory[]> {
+    await ensureDataDir();
+    const dir = dataDir();
+    let files: string[] = [];
+    try {
+      files = await fs.readdir(dir);
+    } catch {
+      return [];
+    }
+    const out: ProjectMemory[] = [];
+    for (const f of files) {
+      if (!f.endsWith(".json") || f === "last-review.json") continue;
+      try {
+        const raw = await fs.readFile(path.join(dir, f), "utf-8");
+        const mem = JSON.parse(raw) as ProjectMemory;
+        if (mem?.repoId) out.push(mem);
+      } catch {
+        /* skip corrupt */
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Migrate legacy numeric / bare owner-repo ids to github.com/owner/repo.
+   * Merges into existing canonical memory when both exist.
+   */
+  async migrateRepoIds(): Promise<{
+    migrated: string[];
+    merged: string[];
+    skipped: string[];
+  }> {
+    const all = await this.listAll();
+    const migrated: string[] = [];
+    const merged: string[] = [];
+    const skipped: string[] = [];
+
+    for (const mem of all) {
+      const oldId = mem.repoId;
+      // Already canonical
+      if (oldId.startsWith("github.com/") || oldId.includes("://")) {
+        skipped.push(oldId);
+        continue;
+      }
+      // Numeric github id only — cannot recover owner/repo without remoteUrl
+      const looksNumeric = /^\d+$/.test(oldId);
+      let newId: string | null = null;
+
+      if (mem.remoteUrl) {
+        newId = mem.remoteUrl
+          .replace(/^https?:\/\//, "")
+          .replace(/\.git$/, "")
+          .replace(/\/$/, "");
+      } else if (mem.repoName && mem.repoName.includes("/")) {
+        newId = `github.com/${mem.repoName}`;
+      } else if (!looksNumeric && oldId.includes("/")) {
+        newId = oldId.startsWith("github.com/") ? oldId : `github.com/${oldId}`;
+      }
+
+      if (!newId || newId === oldId) {
+        skipped.push(oldId);
+        continue;
+      }
+
+      const existing = await this.get(newId);
+      if (existing) {
+        // Merge arrays (dedupe by text-ish keys)
+        const mergeRules = (a: any[], b: any[], key: string) => {
+          const seen = new Set(a.map((x) => String(x[key] || "").toLowerCase()));
+          for (const item of b) {
+            const k = String(item[key] || "").toLowerCase();
+            if (k && seen.has(k)) continue;
+            a.push(item);
+            if (k) seen.add(k);
+          }
+        };
+        mergeRules(existing.styleRules, mem.styleRules || [], "rule");
+        mergeRules(existing.architectureNotes, mem.architectureNotes || [], "note");
+        mergeRules(existing.patterns, mem.patterns || [], "description");
+        mergeRules(existing.historicalFeedback, mem.historicalFeedback || [], "summary");
+        existing.rawSnippets = [
+          ...(mem.rawSnippets || []),
+          ...(existing.rawSnippets || []),
+        ].slice(0, 200);
+        existing.metadata.prsAnalyzed =
+          (existing.metadata.prsAnalyzed || 0) + (mem.metadata?.prsAnalyzed || 0);
+        existing.metadata.updatedAt = new Date().toISOString();
+        await this.save(existing);
+        // Remove old file
+        try {
+          await fs.unlink(memoryPath(oldId));
+        } catch {
+          /* ignore */
+        }
+        merged.push(`${oldId} → ${newId}`);
+      } else {
+        mem.repoId = newId;
+        if (!mem.remoteUrl) mem.remoteUrl = newId;
+        mem.metadata.updatedAt = new Date().toISOString();
+        await this.save(mem);
+        if (memoryPath(oldId) !== memoryPath(newId)) {
+          try {
+            await fs.unlink(memoryPath(oldId));
+          } catch {
+            /* ignore */
+          }
+        }
+        migrated.push(`${oldId} → ${newId}`);
+      }
+    }
+
+    return { migrated, merged, skipped };
+  }
+
+
   async exportJSON(repoId: string): Promise<ProjectMemory | null> {
     return this.get(repoId);
   }
