@@ -18,7 +18,7 @@ Archivist is **Node.js / TypeScript**. Distribution is **npm + GitHub**, not PyP
 Enables `npm install -g archivist` / `npx archivist` from the registry.
 
 1. npmjs.com account  
-2. Confirm package name availability (`archivist` or `@feralxr/archivist`)  
+2. Confirm package name availability (`@feralxr/archivist` (scoped package))  
 3. Locally:
 
 ```bash

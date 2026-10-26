@@ -17,7 +17,7 @@ const program = new Command();
 program
   .name("archivist")
   .description("Memory-aware code review for GitHub — CLI + GitHub App")
-  .version("0.1.0")
+  .version("0.4.0")
   .option("--cwd <path>", "Run as if started in this directory (for multi-repo workflows)");
 
 function workDir(): string {
@@ -33,31 +33,37 @@ function workDir(): string {
 
 program
   .command("setup")
-  .description("Show setup instructions")
-  .action(() => {
-    console.log(`
+  .description("Interactive setup wizard (or --print for text only)")
+  .option("--print", "Print static instructions only (non-interactive)")
+  .action(async (opts: { print?: boolean }) => {
+    workDir();
+    if (opts.print) {
+      console.log(`
 Archivist setup
 ───────────────
 1. Model key (at least one)
-   OPENROUTER_API_KEY=...   # free models: https://openrouter.ai
-   ANTHROPIC_API_KEY=...    # Claude
-   OPENAI_API_KEY=...       # GPT
-   ARCHIVIST_PROVIDER=openai   # optional force
-   ARCHIVIST_MODEL=gpt-4o-mini\n   # archivist models --list
+   OPENROUTER_API_KEY=...
+   ANTHROPIC_API_KEY=...
+   OPENAI_API_KEY=...
+   ARCHIVIST_PROVIDER=openai
+   ARCHIVIST_MODEL=gpt-4o-mini
+   archivist models --list
 
 2. Local workflow
    archivist init
    archivist memory:add -t style -c "Prefer early returns"
-   archivist review              # reviews current git diff
-   archivist review --staged
-   archivist review --file changes.diff
+   archivist review
 
-3. GitHub App (automatic PR reviews)
-   See docs/GITHUB_APP.md
+3. GitHub App — docs/GITHUB_APP.md + docs/DEPLOY.md
 
 Status: OpenRouter ${hasOpenRouter() ? "✓" : "✗"}  Anthropic ${hasAnthropic() ? "✓" : "✗"}  OpenAI ${hasOpenAI() ? "✓" : "✗"}  App ${hasGitHubApp() ? "✓" : "✗"}
 `);
+      return;
+    }
+    const { runSetupWizard } = await import("./setup-wizard.js");
+    await runSetupWizard(process.cwd());
   });
+
 
 program
   .command("doctor")
@@ -259,7 +265,31 @@ program
     }
 
     const memory = await memoryStore.create(repoId, name, remoteUrl);
-    console.log(`✓ Created memory for ${memory.repoName}`);
+    const seed =
+      (process.env.ARCHIVIST_SEED_DEFAULTS || "true").toLowerCase() !== "false" &&
+      process.env.ARCHIVIST_SEED_DEFAULTS !== "0";
+    if (seed) {
+      const defaults = [
+        "Prefer clear, explicit error handling over silent failures",
+        "Avoid any in public APIs — use precise types",
+        "Do not break public API without a major version bump",
+        "Prefer small, focused diffs over large unrelated changes",
+      ];
+      for (const rule of defaults) {
+        await memoryStore.addStyleRule(repoId, {
+          rule,
+          source: "manual",
+          confidence: 0.7,
+        });
+      }
+      await memoryStore.addPattern(repoId, {
+        description: "Validate external input at system boundaries",
+        preferred: true,
+      });
+      console.log(`✓ Created memory for ${memory.repoName} (seeded ${defaults.length + 1} starter rules)`);
+    } else {
+      console.log(`✓ Created memory for ${memory.repoName}`);
+    }
     if (remoteUrl) console.log(`  Remote: ${remoteUrl}`);
     console.log(`  Data:  .archivist/`);
   });

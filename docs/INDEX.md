@@ -27,6 +27,7 @@
 | Tests & eval | [TESTING.md](./TESTING.md) |
 | Secrets & safe ops | [SECURITY.md](./SECURITY.md) |
 | Publishing | [RELEASING.md](./RELEASING.md) |
+| npm scope | [NPM.md](./NPM.md) |
 
 ## Contributing
 

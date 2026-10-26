@@ -105,6 +105,7 @@ Guide: **[docs/GITHUB_APP.md](docs/GITHUB_APP.md)** · Deploy: **[docs/DEPLOY.md
 | [CI_REVIEW.md](docs/CI_REVIEW.md) | Use Archivist in GitHub Actions |
 | [SECURITY.md](docs/SECURITY.md) | Secrets, tokens, redaction |
 | [RELEASING.md](docs/RELEASING.md) | npm / GitHub releases (not PyPI) |
+| [NPM.md](docs/NPM.md) | Publish `@feralxr/archivist` |
 
 ---
 

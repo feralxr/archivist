@@ -1,0 +1,33 @@
+# fly.io deploy template — https://fly.io
+# fly launch --no-deploy  (or copy this file)
+# fly secrets set OPENAI_API_KEY=... GITHUB_APP_ID=... GITHUB_PRIVATE_KEY=... GITHUB_WEBHOOK_SECRET=...
+# fly deploy
+
+app = "archivist-app"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

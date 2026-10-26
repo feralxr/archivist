@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+
+### Highlights
+- **Interactive `archivist setup`** wizard writes `.env`
+- **Stronger review prompts** (dogfooded signal rules)
+- **`init` seeds** high-quality starter memory (disable with `ARCHIVIST_SEED_DEFAULTS=false`)
+- Package renamed to **`@feralxr/archivist`** for npm publish
+- **fly.toml** + Fly deploy section in DEPLOY.md
+- docs/NPM.md publish guide
+
 ## 0.3.9
 
 ### Polish
