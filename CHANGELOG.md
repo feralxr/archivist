@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.2
+
+### Fixes (code review)
+- **Memory id alignment**: GitHub App uses `github.com/owner/repo` (same as CLI), not numeric repo id
+- **REQUEST_CHANGES** disabled by default (opt-in via `ARCHIVIST_REQUEST_CHANGES=true`)
+- Prompt profile reads from parsed env as well as process.env
+
 ## 0.4.1
 
 ### Prompt profiles

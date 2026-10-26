@@ -8,6 +8,7 @@ import {
   type PromptProfileId,
 } from "./profiles.js";
 import { log } from "../core/logger.js";
+import { env } from "../core/config.js";
 
 /** @deprecated Use resolveSystemPrompt() — kept for callers expecting a constant */
 export const REVIEW_SYSTEM_PROMPT = getProfile("balanced").systemPrompt;
@@ -26,13 +27,14 @@ export function resolveSystemPrompt(overrides?: {
   const profileId = (
     overrides?.profile ||
     process.env.ARCHIVIST_PROMPT_PROFILE ||
+    env.ARCHIVIST_PROMPT_PROFILE ||
     DEFAULT_PROFILE_ID
   )
     .toLowerCase()
     .trim() as PromptProfileId;
 
   const customPath =
-    overrides?.customPath || process.env.ARCHIVIST_CUSTOM_PROMPT || "";
+    overrides?.customPath || process.env.ARCHIVIST_CUSTOM_PROMPT || env.ARCHIVIST_CUSTOM_PROMPT || "";
 
   if (profileId === "custom" || customPath) {
     const path = customPath;

@@ -1,5 +1,6 @@
 import type { EmitterWebhookEvent } from "@octokit/webhooks";
 import { memoryStore } from "../memory/store.js";
+import { githubRepoId } from "../memory/repo-id.js";
 import { getInstallationOctokit, createGitHubApp } from "./app.js";
 import { promoteFeedback } from "../memory/learn.js";
 import { log } from "../core/logger.js";
@@ -23,7 +24,7 @@ export async function handleReviewSubmitted(event: ReviewEvent) {
   const login = review.user?.login?.toLowerCase() || "";
   if (login.includes("archivist")) return;
 
-  const repoId = String(repo.id);
+  const repoId = githubRepoId(repo.full_name, repo.html_url);
   const repoFullName = repo.full_name;
 
   log.info("Learning from human review", {
@@ -125,7 +126,7 @@ export async function handleReviewCommentCreated(event: ReviewCommentEvent) {
   if (body.length < 30 || body.length > 2000) return;
   if (/^(lgtm|looks good|ship it|nit)\.?$/i.test(body)) return;
 
-  const repoId = String(repo.id);
+  const repoId = githubRepoId(repo.full_name, repo.html_url);
   const repoFullName = repo.full_name;
 
   log.info("Learning from inline review comment", {

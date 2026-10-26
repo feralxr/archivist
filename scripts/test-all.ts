@@ -75,6 +75,7 @@ async function main() {
   const { REVIEW_SYSTEM_PROMPT, buildUserPrompt } = await import("../src/review/prompts.js");
   const { analyzeDiff } = await import("../src/review/diff-stats.js");
   const { chunkDiff } = await import("../src/review/chunk.js");
+  const { githubRepoId } = await import("../src/memory/repo-id.js");
   const { cosine } = await import("../src/memory/embeddings.js");
   const { metrics } = await import("../src/core/metrics.js");
 
@@ -301,6 +302,15 @@ async function main() {
       diff: "x".repeat(200_000),
     });
     assertIncludes(prompt, "truncated");
+  });
+
+  test("memory", "githubRepoId canonical form", () => {
+    assert(githubRepoId("org/repo") === "github.com/org/repo", "default host");
+    assert(githubRepoId("github.com/org/repo") === "github.com/org/repo", "idempotent");
+    assert(
+      githubRepoId("org/repo", "https://github.com/org/repo") === "github.com/org/repo",
+      "from html url"
+    );
   });
 
   test("review", "chunkDiff splits multi-file", () => {

@@ -7,6 +7,7 @@ import { ingestPullRequest } from "./ingest.js";
 import { postReviewComments } from "./comments.js";
 import { publishCheckRun } from "./checks.js";
 import { hasAnyModelKey } from "../core/config.js";
+import { githubRepoId } from "../memory/repo-id.js";
 import { log } from "../core/logger.js";
 import { reviewQueue } from "../core/queue.js";
 import { withRetry } from "../core/retry.js";
@@ -104,8 +105,8 @@ export async function handlePullRequestEvent(
     return;
   }
 
-  const repoId = String(repo.id);
   const repoFullName = repo.full_name;
+  const repoId = githubRepoId(repoFullName, repo.html_url);
 
   log.info("PR event received", {
     action,

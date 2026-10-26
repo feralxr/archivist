@@ -28,11 +28,14 @@ export async function postReviewComments(
     .map((c) => toInline(c))
     .filter((c) => c.body.length > 0);
 
-  // Decide review event
+  // Default COMMENT — REQUEST_CHANGES can block merges unexpectedly.
+  // Opt in with ARCHIVIST_REQUEST_CHANGES=true
   const hasError = result.comments.some((c) => c.severity === "error");
-  const event: "REQUEST_CHANGES" | "COMMENT" = hasError
-    ? "REQUEST_CHANGES"
-    : "COMMENT";
+  const allowRequestChanges =
+    (process.env.ARCHIVIST_REQUEST_CHANGES || "").toLowerCase() === "true" ||
+    process.env.ARCHIVIST_REQUEST_CHANGES === "1";
+  const event: "REQUEST_CHANGES" | "COMMENT" =
+    hasError && allowRequestChanges ? "REQUEST_CHANGES" : "COMMENT";
 
   try {
     await withRetry(() =>

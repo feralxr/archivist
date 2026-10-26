@@ -2,6 +2,7 @@ import type { EmitterWebhookEvent } from "@octokit/webhooks";
 import { createGitHubApp, getInstallationOctokit } from "./app.js";
 import { bootstrapRepositoryMemory } from "./ingest.js";
 import { memoryStore } from "../memory/store.js";
+import { githubRepoId } from "../memory/repo-id.js";
 import { log } from "../core/logger.js";
 import { reviewQueue } from "../core/queue.js";
 import { metrics } from "../core/metrics.js";
@@ -45,7 +46,7 @@ export async function handleInstallationCreated(event: InstallationEvent) {
     const [owner, name] = r.full_name.split("/");
     if (!owner || !name) continue;
 
-    const repoId = String(r.id);
+    const repoId = githubRepoId(r.full_name);
 
     await reviewQueue.run(async () => {
       try {
@@ -96,7 +97,7 @@ export async function handleInstallationReposAdded(
   for (const r of repos) {
     const [owner, name] = r.full_name.split("/");
     if (!owner || !name) continue;
-    const repoId = String(r.id);
+    const repoId = githubRepoId(r.full_name);
 
     await reviewQueue.run(async () => {
       try {

@@ -17,7 +17,7 @@ const program = new Command();
 program
   .name("archivist")
   .description("Memory-aware code review for GitHub — CLI + GitHub App")
-  .version("0.4.0")
+  .version("0.4.2")
   .option("--cwd <path>", "Run as if started in this directory (for multi-repo workflows)");
 
 function workDir(): string {
