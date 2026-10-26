@@ -72,7 +72,8 @@ async function main() {
   const { parseGithubRepo } = await import("../src/memory/bootstrap-cli.js");
   const { createModelFromEnv, createModel } = await import("../src/models/provider.js");
   const { ReviewEngine } = await import("../src/review/engine.js");
-  const { REVIEW_SYSTEM_PROMPT, buildUserPrompt } = await import("../src/review/prompts.js");
+  const { resolveSystemPrompt, buildUserPrompt } = await import("../src/review/prompts.js");
+  const { listProfiles, getProfile } = await import("../src/review/profiles.js");
   const { analyzeDiff } = await import("../src/review/diff-stats.js");
   const { chunkDiff } = await import("../src/review/chunk.js");
   const { githubRepoId } = await import("../src/memory/repo-id.js");
@@ -282,8 +283,23 @@ async function main() {
 
   // ── review prompts ──
   test("review", "system prompt substantial", () => {
-    assert(REVIEW_SYSTEM_PROMPT.length > 200, "length");
-    assertIncludes(REVIEW_SYSTEM_PROMPT, "JSON");
+    const prompt = resolveSystemPrompt({ profile: "balanced" });
+    assert(prompt.length > 400, "length");
+    assertIncludes(prompt, "JSON");
+  });
+
+  test("review", "strict profile is stricter than minimal", () => {
+    const strict = resolveSystemPrompt({ profile: "strict" });
+    const minimal = resolveSystemPrompt({ profile: "minimal" });
+    assert(strict.length > minimal.length, "strict should be longer");
+    assertIncludes(strict, "STRICT");
+  });
+
+  test("review", "all built-in profiles load", () => {
+    for (const p of listProfiles()) {
+      const text = getProfile(p.id).systemPrompt;
+      assert(text.length > 100, p.id);
+    }
   });
 
   test("review", "buildUserPrompt content", () => {
@@ -302,6 +318,25 @@ async function main() {
       diff: "x".repeat(200_000),
     });
     assertIncludes(prompt, "truncated");
+  });
+
+  test("memory", "migrateRepoIds merges legacy", async () => {
+    const store = new MemoryStore();
+    const legacyId = "999001";
+    await store.create(legacyId, "org/demo-repo");
+    // set remote so migrate can resolve
+    const mem = await store.get(legacyId);
+    assert(mem, "legacy exists");
+    mem!.remoteUrl = "github.com/org/demo-repo";
+    await store.save(mem!);
+    const result = await store.migrateRepoIds();
+    assert(
+      result.migrated.some((m) => m.includes("999001")) ||
+        result.merged.some((m) => m.includes("999001")),
+      "should migrate or merge"
+    );
+    const canonical = await store.get("github.com/org/demo-repo");
+    assert(canonical, "canonical memory exists");
   });
 
   test("memory", "githubRepoId canonical form", () => {

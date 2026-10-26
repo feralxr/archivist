@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.4
+
+### Depth / finish
+- Atomic-only `create()` (no non-atomic rewrite)
+- Learning: promote strong single-shot directives; architecture notes from feedback
+- Tests: profiles, strict vs minimal, migrateRepoIds
+- docs/STATUS.md + scripts/finish-check.sh
+
 ## 0.4.3
 
 ### Finish current surface

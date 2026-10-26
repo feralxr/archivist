@@ -22,9 +22,13 @@ export async function promoteFeedback(repoId: string): Promise<{
   );
 
   for (const fb of memory.historicalFeedback) {
-    if (fb.frequency < 2) continue;
     const summary = fb.summary.trim();
     if (summary.length < 20 || summary.length > 220) continue;
+    const strong = /\b(must|never|always|do not|don't|avoid|require|forbidden)\b/i.test(
+      summary
+    );
+    // Promote recurring feedback, or single strong directives
+    if (fb.frequency < 2 && !(strong && fb.frequency >= 1)) continue;
     const key = normalizeKey(summary);
     if (existingRules.has(key) || existingPatterns.has(key)) continue;
 
@@ -35,6 +39,15 @@ export async function promoteFeedback(repoId: string): Promise<{
         confidence: Math.min(0.5 + fb.frequency * 0.08, 0.92),
       });
       existingRules.add(key);
+      promoted++;
+      continue;
+    }
+
+    if (looksLikeArchitecture(summary)) {
+      await memoryStore.addArchitectureNote(repoId, {
+        note: cleanRule(summary),
+        source: "review",
+      });
       promoted++;
       continue;
     }
@@ -106,6 +119,20 @@ export async function runLearningPass(repoId: string): Promise<{
   const { promoted } = await promoteFeedback(repoId);
   const { inferred } = await inferFromSnippets(repoId);
   return { merged, trimmed, promoted, inferred };
+}
+
+function looksLikeArchitecture(text: string): boolean {
+  const t = text.toLowerCase();
+  return (
+    t.includes("architecture") ||
+    t.includes("layer") ||
+    t.includes("boundary") ||
+    t.includes("must not import") ||
+    t.includes("belongs in") ||
+    t.includes("separation of concerns") ||
+    t.includes("domain layer") ||
+    t.includes("infrastructure")
+  );
 }
 
 function looksLikeStyleRule(text: string): boolean {

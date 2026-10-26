@@ -29,6 +29,7 @@
 | Secrets & safe ops | [SECURITY.md](./SECURITY.md) |
 | Publishing | [RELEASING.md](./RELEASING.md) |
 | npm scope | [NPM.md](./NPM.md) |
+| Project status | [STATUS.md](./STATUS.md) |
 
 ## Contributing
 

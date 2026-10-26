@@ -83,10 +83,9 @@ export class MemoryStore {
         prsAnalyzed: 0,
       },
     };
+    // save() increments version — start at 0 so first persist is v1
+    memory.metadata.version = 0;
     await this.save(memory);
-    // version was bumped by save from 1→2; reset to 1 for create semantics
-    memory.metadata.version = 1;
-    await fs.writeFile(memoryPath(repoId), JSON.stringify(memory, null, 2), "utf-8");
     return memory;
   }
 
