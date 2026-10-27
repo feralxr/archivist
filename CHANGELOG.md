@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.11
+
+### Hardening
+- CLI bootstrap: rate-limit aware `githubFetch` + polite pause between PRs
+- Bootstrap runs consolidate before promote/infer
+- Richer `memory:quality` tips (embeddings, learn, preferred patterns)
+- Check run title includes prompt profile when set
+
 ## 0.4.10
 
 ### Hardening

@@ -133,8 +133,10 @@ export async function bootstrapRepositoryMemory(
   }
 
   // Learning pass on what we collected
+  const { merged, trimmed } = await memoryStore.consolidate(repoId);
   const { promoted } = await promoteFeedback(repoId);
   const { inferred } = await inferFromSnippets(repoId);
+  log.info("Bootstrap learning", { merged, trimmed, promoted, inferred });
 
   log.info("Bootstrap complete", {
     repo: `${owner}/${repo}`,

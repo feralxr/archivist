@@ -236,6 +236,11 @@ export function memoryQualityScore(memory: ProjectMemory): {
       'Add architecture notes: archivist memory:add -t architecture -c "..."'
     );
   }
+  if (memory.patterns.filter((p) => p.preferred).length < 1) {
+    tips.push(
+      'Add preferred patterns: archivist memory:add -t preferred -c "..."'
+    );
+  }
   if (memory.historicalFeedback.length + memory.rawSnippets.length < 5) {
     tips.push(
       "Run archivist memory:bootstrap owner/repo or review more PRs so Archivist can learn"
@@ -244,6 +249,31 @@ export function memoryQualityScore(memory: ProjectMemory): {
   if (memory.metadata.prsAnalyzed === 0) {
     tips.push(
       "No PRs analyzed yet — install the GitHub App or run memory:bootstrap"
+    );
+  }
+  const withEmb =
+    memory.styleRules.filter((r) => r.embedding?.length).length +
+    memory.patterns.filter((p) => p.embedding?.length).length;
+  const totalItems =
+    memory.styleRules.length +
+    memory.architectureNotes.length +
+    memory.patterns.length;
+  if (totalItems >= 5 && withEmb === 0) {
+    tips.push(
+      "No embeddings yet — set OPENAI_API_KEY or OPENROUTER_API_KEY so search ranks by meaning"
+    );
+  }
+  if (memory.rawSnippets.length > 60 && memory.styleRules.length < 5) {
+    tips.push(
+      "Many raw snippets but few rules — run: archivist memory:learn"
+    );
+  }
+  if (
+    memory.historicalFeedback.some((f) => f.frequency >= 3) &&
+    memory.styleRules.length < 4
+  ) {
+    tips.push(
+      "Recurring feedback detected — run memory:learn to promote into rules"
     );
   }
 

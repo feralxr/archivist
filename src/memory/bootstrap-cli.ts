@@ -7,6 +7,7 @@ import { memoryStore } from "./store.js";
 import { promoteFeedback, inferFromSnippets } from "./learn.js";
 import { log } from "../core/logger.js";
 import { isUsefulReviewComment, isBotLogin, normalizeFeedbackSummary } from "./quality-filter.js";
+import { githubFetch, politePause } from "./github-fetch.js";
 
 export interface BootstrapCliOptions {
   owner: string;
@@ -40,7 +41,7 @@ export async function bootstrapFromGitHubApi(
 
   log.info("CLI bootstrap starting", { repo: `${owner}/${repo}`, limit, authed: Boolean(token) });
 
-  const pullsRes = await fetch(
+  const pullsRes = await githubFetch(
     `${base}/repos/${owner}/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=${Math.min(limit, 50)}`,
     { headers }
   );
@@ -67,7 +68,8 @@ export async function bootstrapFromGitHubApi(
     if (!pr.merged_at) continue;
 
     try {
-      const commentsRes = await fetch(
+      await politePause(150);
+      const commentsRes = await githubFetch(
         `${base}/repos/${owner}/${repo}/pulls/${pr.number}/comments`,
         { headers }
       );
@@ -117,8 +119,10 @@ export async function bootstrapFromGitHubApi(
     await memoryStore.save(memory);
   }
 
+  const { merged, trimmed } = await memoryStore.consolidate(repoId);
   const { promoted } = await promoteFeedback(repoId);
   const { inferred } = await inferFromSnippets(repoId);
+  log.info("Bootstrap learning", { merged, trimmed, promoted, inferred });
 
   log.info("CLI bootstrap complete", {
     repo: `${owner}/${repo}`,

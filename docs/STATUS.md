@@ -1,6 +1,6 @@
 # Project status — finish current surface
 
-Last updated: 0.4.9
+Last updated: 0.4.11
 
 ## Checklist
 
@@ -33,7 +33,7 @@ Last updated: 0.4.9
 - Multi-agent orchestration beyond review
 - Database-backed memory (file store is intentional for v0.4)
 
-| status/doctor JSON | Done (0.4.7–0.4.9) |
-| Review timeout + queue concurrency | Done (0.4.9) |
+| status/doctor JSON | Done (0.4.7–0.4.11) |
+| Review timeout + queue concurrency | Done (0.4.11) |
 
-| Post idempotency + quality filter | Done (0.4.9) |
+| Post idempotency + quality filter | Done (0.4.11) |
