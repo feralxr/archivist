@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.12
+
+### Hardening
+- Delivery tracker: TTL purge + cap eviction (prefer drop completed/failed)
+
 ## 0.4.11
 
 ### Hardening

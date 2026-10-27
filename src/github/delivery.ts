@@ -27,14 +27,30 @@ const TTL_MS = 24 * 60 * 60 * 1000; // align with GitHub retry window
 const MAX_ENTRIES = 2_000;
 
 function cleanup() {
-  if (deliveries.size < MAX_ENTRIES) return;
   const cutoff = Date.now() - TTL_MS;
   for (const [k, v] of deliveries) {
     if (v.updatedAt < cutoff) deliveries.delete(k);
   }
+  if (deliveries.size <= MAX_ENTRIES) return;
+  // Drop oldest completed first, then oldest anything
+  const entries = [...deliveries.entries()].sort(
+    (a, b) => a[1].updatedAt - b[1].updatedAt
+  );
+  for (const [k, v] of entries) {
+    if (deliveries.size <= MAX_ENTRIES) break;
+    if (v.status === "completed" || v.status === "failed") {
+      deliveries.delete(k);
+    }
+  }
+  for (const [k] of entries) {
+    if (deliveries.size <= MAX_ENTRIES) break;
+    deliveries.delete(k);
+  }
 }
 
-export function getDeliveryId(headers: Record<string, string | string[] | undefined>): string | null {
+export function getDeliveryId(
+  headers: Record<string, string | string[] | undefined>
+): string | null {
   const raw =
     headers["x-github-delivery"] ||
     headers["X-GitHub-Delivery"] ||
@@ -43,7 +59,9 @@ export function getDeliveryId(headers: Record<string, string | string[] | undefi
   return Array.isArray(raw) ? raw[0] : raw;
 }
 
-export function getEventName(headers: Record<string, string | string[] | undefined>): string {
+export function getEventName(
+  headers: Record<string, string | string[] | undefined>
+): string {
   const raw =
     headers["x-github-event"] ||
     headers["X-GitHub-Event"] ||
@@ -56,7 +74,10 @@ export function getEventName(headers: Record<string, string | string[] | undefin
  * Returns true if this delivery was already completed successfully.
  * Marks the delivery as processing otherwise.
  */
-export function beginDelivery(id: string, event: string): { skip: boolean; attempts: number } {
+export function beginDelivery(
+  id: string,
+  event: string
+): { skip: boolean; attempts: number } {
   cleanup();
   const existing = deliveries.get(id);
   if (existing?.status === "completed") {
@@ -85,36 +106,46 @@ export function beginDelivery(id: string, event: string): { skip: boolean; attem
 
 export function completeDelivery(id: string) {
   const rec = deliveries.get(id);
-  if (!rec) return;
+  if (!rec) {
+    deliveries.set(id, {
+      id,
+      event: "unknown",
+      status: "completed",
+      attempts: 1,
+      updatedAt: Date.now(),
+    });
+    return;
+  }
   rec.status = "completed";
   rec.updatedAt = Date.now();
   rec.lastError = undefined;
-  metrics.inc("webhookCompleted");
 }
 
-export function failDelivery(id: string, error: unknown) {
+export function failDelivery(id: string, error: string) {
   const rec = deliveries.get(id);
-  const message = error instanceof Error ? error.message : String(error);
-  if (rec) {
-    rec.status = "failed";
-    rec.lastError = message.slice(0, 500);
-    rec.updatedAt = Date.now();
+  if (!rec) {
+    deliveries.set(id, {
+      id,
+      event: "unknown",
+      status: "failed",
+      attempts: 1,
+      lastError: error.slice(0, 500),
+      updatedAt: Date.now(),
+    });
+    return;
   }
-  metrics.inc("webhookFailures");
-  log.warn("Webhook delivery failed — GitHub may retry", {
-    id,
-    attempts: rec?.attempts,
-    error: message.slice(0, 300),
-  });
+  rec.status = "failed";
+  rec.lastError = error.slice(0, 500);
+  rec.updatedAt = Date.now();
 }
 
 export function deliveryStats() {
   let processing = 0;
   let completed = 0;
   let failed = 0;
-  for (const d of deliveries.values()) {
-    if (d.status === "processing") processing++;
-    else if (d.status === "completed") completed++;
+  for (const v of deliveries.values()) {
+    if (v.status === "processing") processing++;
+    else if (v.status === "completed") completed++;
     else failed++;
   }
   return { tracked: deliveries.size, processing, completed, failed };
