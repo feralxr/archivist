@@ -78,6 +78,7 @@ async function main() {
   const { chunkDiff } = await import("../src/review/chunk.js");
   const { extractChangedLines, extractPathsFromDiff } = await import("../src/review/engine.js");
   const { githubRepoId } = await import("../src/memory/repo-id.js");
+  const { isUsefulReviewComment, isBotLogin } = await import("../src/memory/quality-filter.js");
   const { cosine } = await import("../src/memory/embeddings.js");
   const { metrics } = await import("../src/core/metrics.js");
 
@@ -338,6 +339,14 @@ async function main() {
     );
     const canonical = await store.get("github.com/org/demo-repo");
     assert(canonical, "canonical memory exists");
+  });
+
+  test("memory", "quality filter noise", () => {
+    assert(!isUsefulReviewComment("LGTM"), "lgtm");
+    assert(!isUsefulReviewComment("looks good"), "looks good");
+    assert(isUsefulReviewComment("Please avoid any in public APIs; use a concrete type instead."), "useful");
+    assert(isBotLogin("dependabot[bot]"), "bot");
+    assert(!isBotLogin("alice"), "human");
   });
 
   test("memory", "githubRepoId canonical form", () => {

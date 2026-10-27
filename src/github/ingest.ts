@@ -2,6 +2,7 @@ import type { Octokit } from "@octokit/rest";
 import { memoryStore } from "../memory/store.js";
 import { promoteFeedback, inferFromSnippets } from "../memory/learn.js";
 import { log } from "../core/logger.js";
+import { isUsefulReviewComment, isBotLogin, normalizeFeedbackSummary } from "../memory/quality-filter.js";
 
 interface IngestOptions {
   owner: string;
@@ -27,8 +28,8 @@ export async function ingestPullRequest(
     });
 
     for (const comment of reviewComments) {
-      if (comment.user?.type === "Bot") continue;
-      if (!comment.body || comment.body.length < 20) continue;
+      if (comment.user?.type === "Bot" || isBotLogin(comment.user?.login)) continue;
+      if (!comment.body || !isUsefulReviewComment(comment.body)) continue;
 
       await memoryStore.addRawSnippet(repoId, {
         text: comment.body,
@@ -95,8 +96,8 @@ export async function bootstrapRepositoryMemory(
       });
 
       for (const comment of comments) {
-        if (comment.user?.type === "Bot") continue;
-        if (!comment.body || comment.body.length < 30) continue;
+        if (comment.user?.type === "Bot" || isBotLogin(comment.user?.login)) continue;
+        if (!comment.body || !isUsefulReviewComment(comment.body)) continue;
 
         await memoryStore.addRawSnippet(repoId, {
           text: comment.body,
@@ -108,7 +109,7 @@ export async function bootstrapRepositoryMemory(
 
         if (comment.body.length <= 280) {
           await memoryStore.addHistoricalFeedback(repoId, {
-            summary: comment.body.replace(/\s+/g, " ").trim().slice(0, 300),
+            summary: normalizeFeedbackSummary(comment.body),
             prNumber: pr.number,
             frequency: 1,
             lastSeen: comment.created_at,

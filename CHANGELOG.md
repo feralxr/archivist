@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.9
+
+### Hardening
+- Shared `quality-filter` for bootstrap/ingest/learn (bots, LGTM, diffs, Archivist markers)
+- Review post idempotency: skip if Archivist already reviewed the commit
+- Graduated post fallback: inline review → summary review → issue comment
+- Tests for quality filter
+
 ## 0.4.8
 
 ### Hardening (depth)

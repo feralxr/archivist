@@ -53,6 +53,10 @@ const SEVERITY_RANK: Record<CommentSeverity, number> = {
 
 /** Phrases that usually mean low-signal nits */
 const NOISE_PATTERNS = [
+  /^lgtm\b/i,
+  /^looks good( to me)?\.?$/i,
+  /^ship it\.?$/i,
+
   /^consider adding a comment/i,
   /^you might want to/i,
   /^this looks fine/i,

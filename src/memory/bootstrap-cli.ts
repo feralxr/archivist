@@ -6,6 +6,7 @@
 import { memoryStore } from "./store.js";
 import { promoteFeedback, inferFromSnippets } from "./learn.js";
 import { log } from "../core/logger.js";
+import { isUsefulReviewComment, isBotLogin, normalizeFeedbackSummary } from "./quality-filter.js";
 
 export interface BootstrapCliOptions {
   owner: string;
@@ -80,7 +81,7 @@ export async function bootstrapFromGitHubApi(
       }>;
 
       for (const comment of comments) {
-        if (comment.user?.type === "Bot") continue;
+        if (comment.user?.type === "Bot" || isBotLogin(comment.user?.login)) continue;
         if (!comment.body || !isUsefulReviewComment(comment.body)) continue;
 
         await memoryStore.addRawSnippet(repoId, {
@@ -93,7 +94,7 @@ export async function bootstrapFromGitHubApi(
 
         if (comment.body.length <= 280) {
           await memoryStore.addHistoricalFeedback(repoId, {
-            summary: comment.body.replace(/\s+/g, " ").trim().slice(0, 300),
+            summary: normalizeFeedbackSummary(comment.body),
             prNumber: pr.number,
             frequency: 1,
             lastSeen: comment.created_at,
@@ -144,10 +145,3 @@ export function parseGithubRepo(input: string): { owner: string; repo: string } 
 }
 
 
-function isUsefulReviewComment(body: string): boolean {
-  const t = body.trim();
-  if (t.length < 30 || t.length > 2000) return false;
-  if (/^(lgtm|looks good|ship it|nit)\.?$/i.test(t)) return false;
-  if (/^[+\- ]/.test(t) && t.split("\n").length > 20) return false; // pasted diff
-  return true;
-}

@@ -4,6 +4,7 @@ import { githubRepoId } from "../memory/repo-id.js";
 import { getInstallationOctokit, createGitHubApp } from "./app.js";
 import { promoteFeedback } from "../memory/learn.js";
 import { log } from "../core/logger.js";
+import { isUsefulReviewComment, isBotLogin, normalizeFeedbackSummary } from "../memory/quality-filter.js";
 
 type ReviewEvent = EmitterWebhookEvent<"pull_request_review">;
 
@@ -22,7 +23,7 @@ export async function handleReviewSubmitted(event: ReviewEvent) {
 
   // Ignore our own bot reviews
   const login = review.user?.login?.toLowerCase() || "";
-  if (login.includes("archivist")) return;
+  if (isBotLogin(login) || login.includes("archivist")) return;
 
   const repoId = githubRepoId(repo.full_name, repo.html_url);
   const repoFullName = repo.full_name;
@@ -50,8 +51,9 @@ export async function handleReviewSubmitted(event: ReviewEvent) {
       (c) =>
         c.user?.login === review.user?.login &&
         c.body &&
-        c.body.length > 25 &&
-        c.user?.type !== "Bot"
+        isUsefulReviewComment(c.body) &&
+        c.user?.type !== "Bot" &&
+        !isBotLogin(c.user?.login)
     );
 
     let ingested = 0;
@@ -66,9 +68,9 @@ export async function handleReviewSubmitted(event: ReviewEvent) {
       });
 
       // Promote concise actionable comments into historical feedback
-      if (comment.body.length >= 30 && comment.body.length <= 280) {
+      if (comment.body.length <= 280) {
         await memoryStore.addHistoricalFeedback(repoId, {
-          summary: comment.body.replace(/\s+/g, " ").trim(),
+          summary: normalizeFeedbackSummary(comment.body),
           prNumber: pr.number,
           frequency: 1,
           lastSeen: comment.created_at,
@@ -77,7 +79,7 @@ export async function handleReviewSubmitted(event: ReviewEvent) {
       ingested++;
     }
 
-    if (review.body && review.body.length > 40) {
+    if (review.body && isUsefulReviewComment(review.body)) {
       await memoryStore.addRawSnippet(repoId, {
         text: review.body,
         prNumber: pr.number,
@@ -120,11 +122,10 @@ export async function handleReviewCommentCreated(event: ReviewCommentEvent) {
   if (comment.user?.type === "Bot") return;
 
   const login = comment.user?.login?.toLowerCase() || "";
-  if (login.includes("archivist")) return;
+  if (isBotLogin(login) || login.includes("archivist")) return;
 
   const body = (comment.body || "").trim();
-  if (body.length < 30 || body.length > 2000) return;
-  if (/^(lgtm|looks good|ship it|nit)\.?$/i.test(body)) return;
+  if (!isUsefulReviewComment(body)) return;
 
   const repoId = githubRepoId(repo.full_name, repo.html_url);
   const repoFullName = repo.full_name;
