@@ -48,9 +48,11 @@ export interface DiffStatsSummary {
   files: number;
   codeFiles: number;
   docFiles: number;
+  lockOrGeneratedFiles?: number;
   added: number;
   removed: number;
   docsOnly: boolean;
+  mostlyGenerated?: boolean;
 }
 
 export interface ReviewMeta {
@@ -61,6 +63,7 @@ export interface ReviewMeta {
   diffStats?: DiffStatsSummary;
   truncatedDiff?: boolean;
   parseFallback?: boolean;
+  promptProfile?: string;
 }
 
 export interface ProjectMemorySnapshot {

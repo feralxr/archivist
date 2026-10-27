@@ -385,6 +385,19 @@ diff --git a/b.ts b/b.ts
     assert(chunks.every((c) => c.chars > 0), "nonempty");
   });
 
+  test("review", "analyzeDiff lockfile mostlyGenerated", () => {
+    const lock = `diff --git a/package-lock.json b/package-lock.json
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1 +1 @@
+-a
++b
+`;
+    const s = analyzeDiff(lock);
+    assert(s.mostlyGenerated === true, "lockfile mostly generated");
+    assert(s.codeFiles === 0, "no code files");
+  });
+
   test("review", "analyzeDiff docs vs code", () => {
     const stats = analyzeDiff(`diff --git a/README.md b/README.md
 --- a/README.md

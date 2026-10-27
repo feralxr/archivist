@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.10
+
+### Hardening
+- Diff stats: lockfile/generated detection (`mostlyGenerated`)
+- Optional `ARCHIVIST_SKIP_GENERATED` short-circuit
+- Review meta includes `promptProfile`
+
 ## 0.4.9
 
 ### Hardening

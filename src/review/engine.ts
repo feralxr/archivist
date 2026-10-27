@@ -79,13 +79,18 @@ export class ReviewEngine {
     const started = Date.now();
     const { repoId, diff, title, body } = params;
     const modelUsed = `${this.model.name}/${this.model.model}`;
+    const promptProfile =
+      process.env.ARCHIVIST_PROMPT_PROFILE ||
+      env.ARCHIVIST_PROMPT_PROFILE ||
+      "balanced";
+
 
     if (!diff || diff.trim().length < 10) {
       return {
         summary: "Empty or trivial diff — nothing to review.",
         comments: [],
         modelUsed,
-        meta: { durationMs: Date.now() - started, diffChars: 0 },
+        meta: { durationMs: Date.now() - started, diffChars: 0, promptProfile },
       };
     }
 
@@ -106,6 +111,24 @@ export class ReviewEngine {
       return {
         summary:
           "Docs-only change detected; skipped detailed review (ARCHIVIST_SKIP_DOCS_ONLY).",
+        comments: [],
+        modelUsed,
+        meta: {
+          durationMs: Date.now() - started,
+          diffChars: diff.length,
+          diffStats: stats,
+          promptProfile,
+        },
+      };
+    }
+
+    const skipGen =
+      (process.env.ARCHIVIST_SKIP_GENERATED || "").toLowerCase() === "true" ||
+      process.env.ARCHIVIST_SKIP_GENERATED === "1";
+    if (skipGen && stats.mostlyGenerated) {
+      return {
+        summary:
+          "Lockfile/generated-only change; skipped detailed review (ARCHIVIST_SKIP_GENERATED).",
         comments: [],
         modelUsed,
         meta: {
@@ -237,6 +260,7 @@ export class ReviewEngine {
         diffStats: stats,
         truncatedDiff,
         parseFallback,
+        promptProfile,
       },
     };
   }
@@ -251,6 +275,10 @@ export class ReviewEngine {
     started: number;
   }): Promise<ReviewResult> {
     const { repoId, chunks, title, body, stats, modelUsed, started } = params;
+    const promptProfile =
+      process.env.ARCHIVIST_PROMPT_PROFILE ||
+      env.ARCHIVIST_PROMPT_PROFILE ||
+      "balanced";
     const allComments: ReviewComment[] = [];
     const summaries: string[] = [];
     let memoryItemsUsed = 0;
@@ -354,6 +382,7 @@ export class ReviewEngine {
         diffStats: stats,
         truncatedDiff: chunks.length > maxChunks,
         parseFallback,
+        promptProfile,
       },
     };
   }
