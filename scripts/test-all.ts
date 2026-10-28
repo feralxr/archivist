@@ -341,6 +341,19 @@ async function main() {
     assert(canonical, "canonical memory exists");
   });
 
+  test("memory", "normalize strips empty rules", async () => {
+    const store = new MemoryStore();
+    const id = "test-normalize-" + randomUUID().slice(0, 8);
+    const mem = await store.create(id, "norm/test");
+    mem.styleRules.push({ id: randomUUID(), rule: "  ", confidence: 0.5 } as any);
+    mem.styleRules.push({ id: randomUUID(), rule: "Keep real rules", confidence: 0.9 });
+    await store.save(mem);
+    const again = await store.get(id);
+    assert(again, "loaded");
+    assert(again!.styleRules.length === 1, "empty stripped");
+    assert(again!.styleRules[0].rule.includes("Keep real"), "kept real");
+  });
+
   test("memory", "quality filter noise", () => {
     assert(!isUsefulReviewComment("LGTM"), "lgtm");
     assert(!isUsefulReviewComment("looks good"), "looks good");

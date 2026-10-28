@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.14
+
+### Hardening
+- Retry: Retry-After header, more network/HTTP codes, broader message matching
+- Memory load normalization (arrays, empty items, metadata defaults)
+- metrics.reviewsSkipped on draft/bot/label skips
+
 ## 0.4.13
 
 ### Hardening

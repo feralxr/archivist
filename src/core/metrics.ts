@@ -6,6 +6,7 @@ export interface MetricsSnapshot {
   reviewsStarted: number;
   reviewsCompleted: number;
   reviewsFailed: number;
+  reviewsSkipped: number;
   commentsPosted: number;
   bootstrapsCompleted: number;
   webhooksReceived: number;
@@ -23,6 +24,7 @@ const counters = {
   reviewsStarted: 0,
   reviewsCompleted: 0,
   reviewsFailed: 0,
+  reviewsSkipped: 0,
   commentsPosted: 0,
   bootstrapsCompleted: 0,
   webhooksReceived: 0,

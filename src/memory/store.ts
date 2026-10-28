@@ -27,6 +27,31 @@ function memoryPath(repoId: string) {
   return path.join(dataDir(), `${safe}.json`);
 }
 
+function normalizeMemory(memory: ProjectMemory): ProjectMemory {
+  if (!memory.rawSnippets) memory.rawSnippets = [];
+  if (!memory.styleRules) memory.styleRules = [];
+  if (!memory.architectureNotes) memory.architectureNotes = [];
+  if (!memory.patterns) memory.patterns = [];
+  if (!memory.historicalFeedback) memory.historicalFeedback = [];
+  if (!memory.metadata) {
+    memory.metadata = {
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      version: 1,
+      prsAnalyzed: 0,
+    };
+  }
+  if (typeof memory.metadata.version !== "number") memory.metadata.version = 1;
+  if (typeof memory.metadata.prsAnalyzed !== "number") memory.metadata.prsAnalyzed = 0;
+  // Drop empty-string rules
+  memory.styleRules = memory.styleRules.filter((r) => r?.rule?.trim());
+  memory.architectureNotes = memory.architectureNotes.filter((n) => n?.note?.trim());
+  memory.patterns = memory.patterns.filter((p) => p?.description?.trim());
+  memory.historicalFeedback = memory.historicalFeedback.filter((f) => f?.summary?.trim());
+  memory.rawSnippets = memory.rawSnippets.filter((s) => s?.text?.trim());
+  return memory;
+}
+
 export class MemoryStore {
   async get(repoId: string): Promise<ProjectMemory | null> {
     try {
@@ -42,8 +67,8 @@ export class MemoryStore {
           })
         );
       }
-      if (!memory.rawSnippets) memory.rawSnippets = [];
-      return memory;
+      // migrate legacy field if present handled above
+      return normalizeMemory(memory);
     } catch {
       return null;
     }

@@ -83,6 +83,7 @@ export async function handlePullRequestEvent(
 
   // Skip drafts on open
   if (action === "opened" && pr.draft) {
+    metrics.inc("reviewsSkipped");
     log.info("Skipping draft PR", { repo: repo.full_name, pr: pr.number });
     return;
   }
@@ -92,6 +93,7 @@ export async function handlePullRequestEvent(
     (typeof l === "string" ? l : l.name || "").toLowerCase()
   );
   if (labels.includes("archivist:skip") || labels.includes("skip-archivist")) {
+    metrics.inc("reviewsSkipped");
     log.info("Skipping PR with archivist:skip label", {
       repo: repo.full_name,
       pr: pr.number,
@@ -108,6 +110,7 @@ export async function handlePullRequestEvent(
     authorLogin.includes("dependabot") ||
     authorLogin.includes("renovate")
   ) {
+    metrics.inc("reviewsSkipped");
     log.info("Skipping bot PR", { repo: repo.full_name, pr: pr.number, author: authorLogin });
     return;
   }
