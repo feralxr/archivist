@@ -121,7 +121,13 @@ export function completeDelivery(id: string) {
   rec.lastError = undefined;
 }
 
-export function failDelivery(id: string, error: string) {
+export function failDelivery(id: string, error: unknown) {
+  const msg =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : String(error);
   const rec = deliveries.get(id);
   if (!rec) {
     deliveries.set(id, {
@@ -129,13 +135,13 @@ export function failDelivery(id: string, error: string) {
       event: "unknown",
       status: "failed",
       attempts: 1,
-      lastError: error.slice(0, 500),
+      lastError: msg.slice(0, 500),
       updatedAt: Date.now(),
     });
     return;
   }
   rec.status = "failed";
-  rec.lastError = error.slice(0, 500);
+  rec.lastError = msg.slice(0, 500);
   rec.updatedAt = Date.now();
 }
 

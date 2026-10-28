@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.13
+
+### Hardening
+- `failDelivery` accepts Error objects (was type-wrong at call site)
+- Check runs: profile in name/meta; mostlyGenerated note
+- Diff chunking prioritizes source → tests → docs → lockfiles
+
 ## 0.4.12
 
 ### Hardening

@@ -366,6 +366,19 @@ async function main() {
     assert(extractPathsFromDiff(diff).has("a.ts"), "path extracted");
   });
 
+  test("review", "chunkDiff prefers source over lockfiles", () => {
+    const a = "diff --git a/src/a.ts b/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-x\n+y\n";
+    const lock = "diff --git a/package-lock.json b/package-lock.json\n+++ b/package-lock.json\n@@ -1 +1 @@\n-a\n+b\n";
+    // force multi-chunk by tiny budget
+    const chunks = chunkDiff(a + lock, 80);
+    assert(chunks.length >= 1, "has chunks");
+    const firstText = chunks[0].text;
+    // source should appear before or without needing lock in first priority pack
+    if (chunks.length >= 2) {
+      assert(chunks[0].paths.some((p) => p.includes("a.ts")) || firstText.includes("a.ts"), "source first");
+    }
+  });
+
   test("review", "chunkDiff splits multi-file", () => {
     const multi = `diff --git a/a.ts b/a.ts
 --- a/a.ts

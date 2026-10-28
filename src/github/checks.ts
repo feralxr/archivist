@@ -64,10 +64,14 @@ export async function publishCheckRun(
   if (result.meta) {
     const m = result.meta;
     summaryLines.push("### Run meta", "");
+    if (m.promptProfile) {
+      summaryLines.push(`- Profile: \`${m.promptProfile}\``);
+    }
     if (m.diffStats) {
       summaryLines.push(
         `- Diff: ${m.diffStats.files} files, +${m.diffStats.added}/-${m.diffStats.removed}` +
-          (m.diffStats.docsOnly ? " (docs-only)" : "")
+          (m.diffStats.docsOnly ? " (docs-only)" : "") +
+          (m.diffStats.mostlyGenerated ? " (mostly generated)" : "")
       );
     }
     if (m.memoryItemsUsed != null) {
@@ -105,7 +109,9 @@ export async function publishCheckRun(
       octokit.request("POST /repos/{owner}/{repo}/check-runs", {
         owner,
         repo,
-        name: "Archivist",
+        name: result.meta?.promptProfile
+          ? `Archivist (${result.meta.promptProfile})`
+          : "Archivist",
         head_sha: headSha,
         status: "completed",
         conclusion,

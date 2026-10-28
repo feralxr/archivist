@@ -30,7 +30,9 @@ export function chunkDiff(
     ];
   }
 
-  const files = splitByFile(diff);
+  const files = splitByFile(diff).sort(
+    (a, b) => filePriority(a.path) - filePriority(b.path)
+  );
   const chunks: DiffChunk[] = [];
   let current: string[] = [];
   let currentPaths: string[] = [];
@@ -115,4 +117,19 @@ function extractPaths(diff: string): string[] {
     }
   }
   return paths;
+}
+
+
+function filePriority(path: string): number {
+  const lower = path.toLowerCase();
+  if (
+    /package-lock\.json$|pnpm-lock\.yaml$|yarn\.lock$|cargo\.lock$|\.min\.(js|css)$|\.map$/.test(
+      lower
+    )
+  ) {
+    return 30;
+  }
+  if (/\.(md|mdx|txt|rst)$|changelog/.test(lower)) return 20;
+  if (/\.(test|spec)\./.test(lower) || /__tests__/.test(lower)) return 5;
+  return 0; // source code first
 }
